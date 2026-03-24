@@ -36,31 +36,34 @@ export default function HomePage() {
   const [cargando, setCargando] = useState(true);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Contenido[]>([]);
 
+  // Cargar datos
+  async function cargarDatos() {
+    setCargando(true);
+    const [m, e, s, t, g, c, b, st] = await Promise.all([
+      obtenerMusica(),
+      obtenerEnsenanzas(),
+      obtenerEstudios(),
+      obtenerTodoContenido(),
+      obtenerGuias(),
+      obtenerComunidades(),
+      obtenerBotLog(),
+      obtenerEstadisticas(),
+    ]);
+    setMusica(m);
+    setEnsenanzas(e);
+    setEstudiosData(s);
+    setTodoContenido(t);
+    setGuiasEstudio(g);
+    setComunidades(c);
+    setBotLog(b);
+    setStats(st);
+    setCargando(false);
+  }
+
   // Cargar datos al iniciar
   useEffect(() => {
-    async function cargarDatos() {
-      setCargando(true);
-      const [m, e, s, t, g, c, b, st] = await Promise.all([
-        obtenerMusica(),
-        obtenerEnsenanzas(),
-        obtenerEstudios(),
-        obtenerTodoContenido(),
-        obtenerGuias(),
-        obtenerComunidades(),
-        obtenerBotLog(),
-        obtenerEstadisticas(),
-      ]);
-      setMusica(m);
-      setEnsenanzas(e);
-      setEstudiosData(s);
-      setTodoContenido(t);
-      setGuiasEstudio(g);
-      setComunidades(c);
-      setBotLog(b);
-      setStats(st);
-      setCargando(false);
-    }
     cargarDatos();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Buscar cuando cambia el query
@@ -536,7 +539,7 @@ export default function HomePage() {
       </div>
 
       <MiniPlayer track={currentTrack} isPlaying={isPlaying} onTogglePlay={() => setIsPlaying(!isPlaying)} onClose={() => { setCurrentTrack(null); setIsPlaying(false); }} />
-      <AddContentModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
+      <AddContentModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onContentAdded={cargarDatos} />
       {currentTrack && <div className="h-16" />}
     </div>
   );
