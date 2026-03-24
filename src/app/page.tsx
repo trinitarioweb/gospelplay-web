@@ -201,9 +201,11 @@ export default function HomePage() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {musicaFiltrada().slice(0, 4).map(item => (
-                    <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} />
+                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                  {musicaFiltrada().map(item => (
+                    <div key={item.id} className="flex-shrink-0 w-72">
+                      <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} />
+                    </div>
                   ))}
                 </div>
                 {musicaFiltrada().length === 0 && (
@@ -220,9 +222,11 @@ export default function HomePage() {
                   </h3>
                 </div>
 
-                <div className="space-y-3">
-                  {ensenanzas.slice(0, 4).map(item => (
-                    <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} compact />
+                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                  {ensenanzas.map(item => (
+                    <div key={item.id} className="flex-shrink-0 w-80">
+                      <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} compact />
+                    </div>
                   ))}
                 </div>
               </section>
