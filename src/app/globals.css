@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+:root {
+  --gp-orange: #f97316;
+  --gp-orange-dark: #ea580c;
+  --gp-orange-light: #fb923c;
+  --gp-bg: #000000;
+  --gp-surface: rgba(255, 255, 255, 0.05);
+  --gp-border: rgba(249, 115, 22, 0.2);
+}
+
+body {
+  background: var(--gp-bg);
+  color: #ffffff;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.3);
+  border-radius: 3px;
+}
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(to right, #fb923c, #f97316);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hide scrollbar for horizontal scroll */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
