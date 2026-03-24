@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         audiencia: body.audiencia || [],
         publicado: true,
         revisado_por_ia: true,
-        creado_por: 'usuario',
+        creado_por: null,
       })
       .select()
       .single();
