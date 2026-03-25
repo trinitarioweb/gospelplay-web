@@ -1,12 +1,17 @@
 'use client';
 
-import { Home, Search, BookOpen, Users, Music, Flame, Radio, X, Library } from 'lucide-react';
+import { Home, Search, BookOpen, Users, Music, Flame, Radio, X, Library, ListMusic, Plus } from 'lucide-react';
+import type { Playlist } from '@/types/content';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  playlists?: (Playlist & { _itemCount?: number })[];
+  onSelectPlaylist?: (id: string) => void;
+  onCreatePlaylist?: () => void;
+  activePlaylistId?: string | null;
 }
 
 const navItems = [
@@ -23,7 +28,7 @@ const libraryItems = [
   { icon: Library, label: 'Mi Biblioteca', id: 'biblioteca' },
 ];
 
-export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, playlists = [], onSelectPlaylist, onCreatePlaylist, activePlaylistId }: SidebarProps) {
   return (
     <>
       {/* Mobile overlay */}
@@ -54,12 +59,12 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: 
                 key={item.id}
                 onClick={() => { setActiveTab(item.id); setIsOpen(false); }}
                 className={`w-full flex items-center gap-4 px-3 py-2.5 rounded-md transition-colors text-sm font-bold ${
-                  activeTab === item.id
+                  activeTab === item.id && !activePlaylistId
                     ? 'text-white'
                     : 'text-[#b3b3b3] hover:text-white'
                 }`}
               >
-                <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                <item.icon size={22} strokeWidth={activeTab === item.id && !activePlaylistId ? 2.5 : 2} />
                 <span>{item.label}</span>
               </button>
             ))}
@@ -79,21 +84,62 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: 
                 key={item.id + item.label}
                 onClick={() => { setActiveTab(item.id); setIsOpen(false); }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm ${
-                  activeTab === item.id
+                  activeTab === item.id && !activePlaylistId
                     ? 'bg-[#282828] text-white font-semibold'
                     : 'text-[#b3b3b3] hover:text-white hover:bg-[#1a1a1a]'
                 }`}
               >
                 <div className={`w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0 ${
-                  activeTab === item.id
+                  activeTab === item.id && !activePlaylistId
                     ? 'bg-gradient-to-br from-amber-500 to-amber-700'
                     : 'bg-[#282828]'
                 }`}>
-                  <item.icon size={18} className={activeTab === item.id ? 'text-black' : 'text-[#b3b3b3]'} />
+                  <item.icon size={18} className={activeTab === item.id && !activePlaylistId ? 'text-black' : 'text-[#b3b3b3]'} />
                 </div>
                 <span>{item.label}</span>
               </button>
             ))}
+
+            {/* Playlists section */}
+            {(playlists.length > 0 || onCreatePlaylist) && (
+              <>
+                <div className="flex items-center justify-between px-3 pt-4 pb-1">
+                  <span className="text-xs font-bold text-[#6a6a6a] uppercase tracking-wider">Mis Playlists</span>
+                  {onCreatePlaylist && (
+                    <button
+                      onClick={onCreatePlaylist}
+                      className="p-1 hover:bg-white/10 rounded-full transition text-[#b3b3b3] hover:text-white"
+                      title="Crear playlist"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
+                </div>
+                {playlists.map(pl => (
+                  <button
+                    key={pl.id}
+                    onClick={() => { onSelectPlaylist?.(pl.id); setIsOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm ${
+                      activePlaylistId === pl.id
+                        ? 'bg-[#282828] text-white font-semibold'
+                        : 'text-[#b3b3b3] hover:text-white hover:bg-[#1a1a1a]'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-md flex items-center justify-center flex-shrink-0 ${
+                      activePlaylistId === pl.id
+                        ? 'bg-gradient-to-br from-amber-500 to-amber-700'
+                        : 'bg-[#282828]'
+                    }`}>
+                      <ListMusic size={18} className={activePlaylistId === pl.id ? 'text-black' : 'text-[#b3b3b3]'} />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="truncate">{pl.nombre}</p>
+                      <p className="text-[10px] text-[#6a6a6a]">{pl._itemCount || 0} canciones</p>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
           </nav>
         </div>
 

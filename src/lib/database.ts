@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Contenido, ClasificacionIA, EvaluacionTeologica, ContenidoBiblico, GuiaEstudio, Comunidad } from '@/types/content';
+import type { Contenido, ClasificacionIA, EvaluacionTeologica, ContenidoBiblico, GuiaEstudio, Comunidad, Playlist, PlaylistItem } from '@/types/content';
 
 // ===== HELPERS: convertir filas de DB a tipos de la app =====
 
@@ -260,4 +260,122 @@ export async function obtenerFavoritos(usuarioId: string) {
 
 export async function registrarBusqueda(query: string, resultados: number) {
   await supabase.from('busquedas').insert({ query, resultados });
+}
+
+// ===== QUERIES DE PLAYLISTS =====
+
+export async function obtenerPlaylists(): Promise<Playlist[]> {
+  const { data, error } = await supabase
+    .from('playlists')
+    .select('*, playlist_items(count)')
+    .order('created_at', { ascending: false });
+
+  if (error) { console.error('Error obteniendo playlists:', error); return []; }
+  return (data || []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    nombre: row.nombre as string,
+    descripcion: (row.descripcion as string) || '',
+    imagen: (row.imagen as string) || '',
+    es_publica: (row.es_publica as boolean) ?? true,
+    items: [],
+    created_at: row.created_at as string,
+    _itemCount: ((row.playlist_items as Array<{ count: number }>)?.[0]?.count) || 0,
+  })) as (Playlist & { _itemCount: number })[];
+}
+
+export async function obtenerPlaylist(id: string): Promise<Playlist | null> {
+  const { data, error } = await supabase
+    .from('playlists')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) { console.error('Error obteniendo playlist:', error); return null; }
+
+  const { data: items, error: itemsError } = await supabase
+    .from('playlist_items')
+    .select('*, contenido(*)')
+    .eq('playlist_id', id)
+    .order('orden', { ascending: true });
+
+  if (itemsError) { console.error('Error obteniendo items de playlist:', itemsError); }
+
+  const playlistItems: PlaylistItem[] = (items || []).map((item: Record<string, unknown>) => ({
+    id: item.id as string,
+    contenido: filaAContenido(item.contenido),
+    orden: item.orden as number,
+  }));
+
+  return {
+    id: data.id,
+    nombre: data.nombre,
+    descripcion: data.descripcion || '',
+    imagen: data.imagen || '',
+    es_publica: data.es_publica ?? true,
+    items: playlistItems,
+    created_at: data.created_at,
+  };
+}
+
+export async function crearPlaylist(nombre: string, descripcion: string): Promise<Playlist | null> {
+  const { data, error } = await supabase
+    .from('playlists')
+    .insert({ nombre, descripcion })
+    .select()
+    .single();
+
+  if (error || !data) { console.error('Error creando playlist:', error); return null; }
+
+  return {
+    id: data.id,
+    nombre: data.nombre,
+    descripcion: data.descripcion || '',
+    imagen: data.imagen || '',
+    es_publica: data.es_publica ?? true,
+    items: [],
+    created_at: data.created_at,
+  };
+}
+
+export async function agregarAPlaylist(playlistId: string, contenidoId: string): Promise<boolean> {
+  // Get current max order
+  const { data: existing } = await supabase
+    .from('playlist_items')
+    .select('orden')
+    .eq('playlist_id', playlistId)
+    .order('orden', { ascending: false })
+    .limit(1);
+
+  const nextOrden = existing && existing.length > 0 ? (existing[0].orden as number) + 1 : 0;
+
+  const { error } = await supabase
+    .from('playlist_items')
+    .insert({ playlist_id: playlistId, contenido_id: contenidoId, orden: nextOrden });
+
+  if (error) { console.error('Error agregando a playlist:', error); return false; }
+  return true;
+}
+
+export async function eliminarDePlaylist(playlistId: string, contenidoId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('playlist_items')
+    .delete()
+    .eq('playlist_id', playlistId)
+    .eq('contenido_id', contenidoId);
+
+  if (error) { console.error('Error eliminando de playlist:', error); return false; }
+  return true;
+}
+
+export async function eliminarPlaylist(id: string): Promise<boolean> {
+  // Delete items first
+  await supabase.from('playlist_items').delete().eq('playlist_id', id);
+
+  const { error } = await supabase
+    .from('playlists')
+    .delete()
+    .eq('id', id);
+
+  if (error) { console.error('Error eliminando playlist:', error); return false; }
+  return true;
 }

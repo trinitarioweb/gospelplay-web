@@ -1,14 +1,23 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, ExternalLink, ChevronUp, Minimize2 } from 'lucide-react';
+import { X, ExternalLink, ChevronUp, Minimize2, SkipBack, SkipForward, ListMusic } from 'lucide-react';
 import type { Contenido } from '@/types/content';
+
+interface PlaylistContext {
+  nombre: string;
+  items: Contenido[];
+  currentIndex: number;
+}
 
 interface MiniPlayerProps {
   track: Contenido | null;
   isPlaying: boolean;
   onTogglePlay: () => void;
   onClose: () => void;
+  playlistContext?: PlaylistContext | null;
+  onNext?: () => void;
+  onPrevious?: () => void;
 }
 
 function extraerYouTubeId(url: string): string | null {
@@ -26,7 +35,7 @@ function extraerYouTubeId(url: string): string | null {
   return null;
 }
 
-export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose }: MiniPlayerProps) {
+export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, playlistContext, onNext, onPrevious }: MiniPlayerProps) {
   const [expanded, setExpanded] = useState(true);
   const prevTrackId = useRef<string | null>(null);
 
@@ -42,6 +51,10 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose }: 
   const youtubeId = extraerYouTubeId(track.url);
   const isYoutube = track.plataforma === 'youtube' && youtubeId;
   const isSpotify = track.plataforma === 'spotify';
+
+  const hasPlaylist = playlistContext && playlistContext.items.length > 1;
+  const canPrevious = hasPlaylist && playlistContext.currentIndex > 0;
+  const canNext = hasPlaylist && playlistContext.currentIndex < playlistContext.items.length - 1;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 transition-all duration-300">
@@ -81,7 +94,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose }: 
           {track.thumbnail ? (
             <img src={track.thumbnail} alt="" className="w-14 h-14 rounded-md object-cover" />
           ) : (
-            <span className="text-[#6a6a6a]">{isYoutube ? '▶' : isSpotify ? '♪' : '♪'}</span>
+            <span className="text-[#6a6a6a]">{isYoutube ? '▶' : '♪'}</span>
           )}
         </div>
 
@@ -89,7 +102,37 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose }: 
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate text-white">{track.titulo}</p>
           <p className="text-xs text-[#b3b3b3] truncate">{track.artista}</p>
+          {hasPlaylist && (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <ListMusic size={10} className="text-amber-400 flex-shrink-0" />
+              <p className="text-[10px] text-amber-400 truncate">
+                {playlistContext.nombre} &middot; {playlistContext.currentIndex + 1} de {playlistContext.items.length}
+              </p>
+            </div>
+          )}
         </div>
+
+        {/* Playlist navigation */}
+        {hasPlaylist && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onPrevious}
+              disabled={!canPrevious}
+              className={`p-2 rounded-full transition ${canPrevious ? 'hover:bg-white/10 text-white' : 'text-[#3a3a3a] cursor-not-allowed'}`}
+              title="Anterior"
+            >
+              <SkipBack size={18} />
+            </button>
+            <button
+              onClick={onNext}
+              disabled={!canNext}
+              className={`p-2 rounded-full transition ${canNext ? 'hover:bg-white/10 text-white' : 'text-[#3a3a3a] cursor-not-allowed'}`}
+              title="Siguiente"
+            >
+              <SkipForward size={18} />
+            </button>
+          </div>
+        )}
 
         {/* Theological score */}
         <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-amber-500/15 rounded text-xs font-bold text-amber-400">

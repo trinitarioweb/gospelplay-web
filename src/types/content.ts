@@ -160,6 +160,24 @@ export interface Usuario {
   historial: string[];
 }
 
+// ===== PLAYLISTS =====
+
+export interface Playlist {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  imagen: string;
+  es_publica: boolean;
+  items: PlaylistItem[];
+  created_at: string;
+}
+
+export interface PlaylistItem {
+  id: string;
+  contenido: Contenido;
+  orden: number;
+}
+
 // ===== FILTROS DE BÚSQUEDA =====
 
 export interface FiltrosBusqueda {
