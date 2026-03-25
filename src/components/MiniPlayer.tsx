@@ -82,7 +82,7 @@ interface YTPlayer {
 }
 
 export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, playlistContext, onNext, onPrevious, isLiked, onLike }: MiniPlayerProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('audio');
+  const [viewMode, setViewMode] = useState<ViewMode>('full');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playerReady, setPlayerReady] = useState(false);
@@ -333,32 +333,40 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
       {isYoutube && (
         <div
           className={`fixed z-40 transition-all duration-300 ease-in-out ${
-            viewMode === 'full'
+            showFullPlayer
+              ? 'pointer-events-none'
+              : viewMode === 'full'
               ? 'bottom-[88px] left-0 right-0 bg-black'
               : viewMode === 'mini'
               ? 'bottom-[96px] right-4 w-72 md:w-80 rounded-lg overflow-hidden shadow-2xl shadow-black/80 border border-[#282828]'
-              : 'fixed bottom-0 left-0 w-[1px] h-[1px] overflow-hidden opacity-0 pointer-events-none'
+              : 'pointer-events-none'
           }`}
+          style={
+            showFullPlayer || viewMode === 'audio'
+              ? { position: 'fixed', left: '-9999px', top: '0px', width: '320px', height: '180px' }
+              : undefined
+          }
         >
           <div
             className={
-              viewMode === 'full'
+              viewMode === 'full' && !showFullPlayer
                 ? 'relative w-full'
-                : viewMode === 'mini'
+                : viewMode === 'mini' && !showFullPlayer
                 ? 'relative w-full aspect-video'
-                : ''
+                : 'relative'
             }
-            style={viewMode === 'full' ? { paddingBottom: '36%', maxHeight: '320px' } : undefined}
+            style={
+              viewMode === 'full' && !showFullPlayer
+                ? { paddingBottom: '36%', maxHeight: '320px' }
+                : showFullPlayer || viewMode === 'audio'
+                ? { width: '320px', height: '180px' }
+                : undefined
+            }
           >
             <div
               id={containerRef.current}
-              className={
-                viewMode === 'full'
-                  ? 'absolute top-0 left-0 w-full h-full'
-                  : viewMode === 'mini'
-                  ? 'absolute top-0 left-0 w-full h-full'
-                  : 'w-[1px] h-[1px]'
-              }
+              className="absolute top-0 left-0 w-full h-full"
+              style={{ minWidth: '320px', minHeight: '180px' }}
             />
           </div>
 

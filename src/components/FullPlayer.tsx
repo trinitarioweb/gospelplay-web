@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronDown, SkipBack, SkipForward, Play, Pause, Shuffle, Repeat,
-  ListPlus, ListMusic, Share2, Video, VideoOff, Heart, ExternalLink
+  ListPlus, ListMusic, Share2, Video, VideoOff, Heart, ExternalLink, Loader2
 } from 'lucide-react';
 import type { Contenido } from '@/types/content';
 import { obtenerPlaylists, agregarAPlaylist, crearPlaylist } from '@/lib/database';
@@ -78,7 +78,13 @@ export default function FullPlayer({
   const [shuffle, setShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [isDragging, setIsDragging] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [lyricsText, setLyricsText] = useState<string | null>(null);
+  const [lyricsFound, setLyricsFound] = useState(false);
+  const [lyricsCachedFor, setLyricsCachedFor] = useState<string | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
   const youtubeId = extraerYouTubeId(track.url);
   const isYoutube = track.plataforma === 'youtube' && youtubeId;
@@ -122,6 +128,69 @@ export default function FullPlayer({
       window.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging, seekToPosition]);
+
+  // Lyrics lines split for rendering
+  const lyricsLines = useMemo(() => {
+    if (!lyricsText) return [];
+    return lyricsText.split('\n');
+  }, [lyricsText]);
+
+  // Estimate which lyric line is "current" based on time proportion
+  const currentLyricIndex = useMemo(() => {
+    if (!lyricsLines.length || !duration) return -1;
+    const proportion = currentTime / duration;
+    // Skip empty lines for index calculation
+    const nonEmptyCount = lyricsLines.filter(l => l.trim().length > 0).length;
+    if (nonEmptyCount === 0) return -1;
+    const targetNonEmpty = Math.floor(proportion * nonEmptyCount);
+    let nonEmptySeen = 0;
+    for (let i = 0; i < lyricsLines.length; i++) {
+      if (lyricsLines[i].trim().length > 0) {
+        if (nonEmptySeen === targetNonEmpty) return i;
+        nonEmptySeen++;
+      }
+    }
+    return lyricsLines.length - 1;
+  }, [lyricsLines, currentTime, duration]);
+
+  // Auto-scroll lyrics
+  useEffect(() => {
+    if (!showLyrics || currentLyricIndex < 0 || !lyricsContainerRef.current) return;
+    const container = lyricsContainerRef.current;
+    const lineEl = container.querySelector(`[data-lyric-index="${currentLyricIndex}"]`) as HTMLElement | null;
+    if (lineEl) {
+      const containerRect = container.getBoundingClientRect();
+      const lineRect = lineEl.getBoundingClientRect();
+      const offset = lineRect.top - containerRect.top - containerRect.height / 3;
+      container.scrollTo({ top: container.scrollTop + offset, behavior: 'smooth' });
+    }
+  }, [currentLyricIndex, showLyrics]);
+
+  const fetchLyrics = useCallback(async () => {
+    // If we already have lyrics cached for this track, just toggle visibility
+    if (lyricsCachedFor === track.id) {
+      setShowLyrics(!showLyrics);
+      return;
+    }
+    setShowLyrics(true);
+    setLyricsLoading(true);
+    try {
+      const res = await fetch('/api/letras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo: track.titulo, artista: track.artista }),
+      });
+      const data = await res.json();
+      setLyricsText(data.letras || 'No se encontro la letra.');
+      setLyricsFound(data.encontrada || false);
+      setLyricsCachedFor(track.id);
+    } catch {
+      setLyricsText('Error al cargar la letra. Intenta de nuevo.');
+      setLyricsFound(false);
+    } finally {
+      setLyricsLoading(false);
+    }
+  }, [track.id, track.titulo, track.artista, lyricsCachedFor, showLyrics]);
 
   const handleAddToPlaylist = async (playlistId: string) => {
     await agregarAPlaylist(playlistId, track.id);
@@ -220,41 +289,84 @@ export default function FullPlayer({
         </div>
       ) : (
         /* Player view */
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-2 overflow-hidden">
+        <div className="flex-1 flex flex-col items-center px-6 pb-2 overflow-y-auto">
           {/* Video / Thumbnail */}
-          <div className="w-full max-w-md aspect-video rounded-xl overflow-hidden bg-black mb-4 shadow-2xl shadow-black/50 relative">
-            {isYoutube && showVideo ? (
-              <div className="w-full h-full bg-black flex items-center justify-center">
-                <p className="text-[#6a6a6a] text-xs">Video reproduciendose</p>
-              </div>
+          {!showLyrics && (
+            <div className="w-full max-w-md aspect-video rounded-xl overflow-hidden bg-black mb-4 shadow-2xl shadow-black/50 relative flex-shrink-0 mt-2">
+              {isYoutube && showVideo ? (
+                <div className="w-full h-full bg-black flex items-center justify-center">
+                  <p className="text-[#6a6a6a] text-xs">Video reproduciendose</p>
+                </div>
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-[#282828] to-[#181818] flex items-center justify-center">
+                  {track.thumbnail ? (
+                    <img src={track.thumbnail} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-6xl text-[#3a3a3a]">♪</div>
+                  )}
+                </div>
+              )}
+
+              {/* Video toggle overlay */}
+              {isYoutube && (
+                <button
+                  onClick={() => setShowVideo(!showVideo)}
+                  className="absolute top-3 right-3 p-2 bg-black/60 rounded-full hover:bg-black/80 transition"
+                >
+                  {showVideo ? <Video size={16} /> : <VideoOff size={16} />}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Letra button */}
+          <button
+            onClick={fetchLyrics}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition mb-3 flex-shrink-0 ${
+              showLyrics
+                ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                : 'bg-[#282828] text-[#b3b3b3] hover:text-white hover:bg-[#3a3a3a]'
+            }`}
+          >
+            {lyricsLoading ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 size={12} className="animate-spin" />
+                Buscando letra...
+              </span>
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[#282828] to-[#181818] flex items-center justify-center">
-                {track.thumbnail ? (
-                  <img src={track.thumbnail} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-6xl text-[#3a3a3a]">♪</div>
-                )}
-              </div>
+              'Letra'
             )}
-
-            {/* Video toggle overlay */}
-            {isYoutube && (
-              <button
-                onClick={() => setShowVideo(!showVideo)}
-                className="absolute top-3 right-3 p-2 bg-black/60 rounded-full hover:bg-black/80 transition"
-              >
-                {showVideo ? <Video size={16} /> : <VideoOff size={16} />}
-              </button>
-            )}
-          </div>
-
-          {/* Letra button placeholder */}
-          <button className="px-4 py-1.5 bg-[#282828] rounded-full text-xs font-semibold text-[#b3b3b3] hover:text-white hover:bg-[#3a3a3a] transition mb-3">
-            Letra
           </button>
 
+          {/* Lyrics display */}
+          {showLyrics && lyricsText && (
+            <div
+              ref={lyricsContainerRef}
+              className="w-full max-w-md flex-1 overflow-y-auto rounded-xl bg-[#0a0a0a] p-4 mb-3 scrollbar-thin scrollbar-thumb-[#3a3a3a] scrollbar-track-transparent"
+              style={{ maxHeight: '40vh' }}
+            >
+              {lyricsLines.map((line, idx) => (
+                <p
+                  key={idx}
+                  data-lyric-index={idx}
+                  className={`text-center py-0.5 transition-all duration-300 text-sm leading-relaxed ${
+                    line.trim().length === 0
+                      ? 'h-4'
+                      : idx === currentLyricIndex
+                      ? 'text-amber-400 font-bold text-base scale-105'
+                      : Math.abs(idx - currentLyricIndex) <= 2
+                      ? 'text-white/70'
+                      : 'text-white/30'
+                  }`}
+                >
+                  {line || '\u00A0'}
+                </p>
+              ))}
+            </div>
+          )}
+
           {/* Title & Artist */}
-          <div className="w-full max-w-md text-center mb-4">
+          <div className="w-full max-w-md text-center mb-4 flex-shrink-0">
             <h2 className="text-xl md:text-2xl font-extrabold text-white truncate">{track.titulo}</h2>
             <p className="text-sm text-[#b3b3b3] mt-1">{track.artista}</p>
           </div>
