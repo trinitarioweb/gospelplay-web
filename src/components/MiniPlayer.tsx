@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ExternalLink, SkipBack, SkipForward, ListMusic, Play, Pause, Video, VideoOff, Maximize2, Minimize2 } from 'lucide-react';
+import { X, ExternalLink, SkipBack, SkipForward, ListMusic, Play, Pause, Video, VideoOff, Maximize2, Minimize2, ChevronUp } from 'lucide-react';
 import type { Contenido } from '@/types/content';
+import FullPlayer from './FullPlayer';
 
 interface PlaylistContext {
   nombre: string;
@@ -18,6 +19,8 @@ interface MiniPlayerProps {
   playlistContext?: PlaylistContext | null;
   onNext?: () => void;
   onPrevious?: () => void;
+  isLiked?: boolean;
+  onLike?: (id: string) => void;
 }
 
 function extraerYouTubeId(url: string): string | null {
@@ -78,12 +81,13 @@ interface YTPlayer {
   loadVideoById: (videoId: string) => void;
 }
 
-export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, playlistContext, onNext, onPrevious }: MiniPlayerProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('full');
+export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, playlistContext, onNext, onPrevious, isLiked, onLike }: MiniPlayerProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('audio');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playerReady, setPlayerReady] = useState(false);
   const [actuallyPlaying, setActuallyPlaying] = useState(false);
+  const [showFullPlayer, setShowFullPlayer] = useState(false);
 
   const playerRef = useRef<YTPlayer | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -284,6 +288,17 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
     };
   }, [isDragging, seekToPosition]);
 
+  const handleSeekFromFull = useCallback((time: number) => {
+    if (playerRef.current && playerReady) {
+      playerRef.current.seekTo(time, true);
+      setCurrentTime(time);
+    }
+  }, [playerReady]);
+
+  const handlePlayPauseFromFull = useCallback(() => {
+    handlePlayPause();
+  }, [handlePlayPause]);
+
   const cycleViewMode = () => {
     if (viewMode === 'audio') setViewMode('mini');
     else if (viewMode === 'mini') setViewMode('full');
@@ -296,6 +311,24 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
 
   return (
     <>
+      {/* ===== FULL PLAYER ===== */}
+      <FullPlayer
+        track={track}
+        isPlaying={actuallyPlaying}
+        isOpen={showFullPlayer}
+        onClose={() => setShowFullPlayer(false)}
+        onTogglePlay={handlePlayPauseFromFull}
+        onNext={onNext}
+        onPrevious={onPrevious}
+        playlistContext={playlistContext}
+        playerRef={playerRef}
+        currentTime={currentTime}
+        duration={duration}
+        onSeek={handleSeekFromFull}
+        isLiked={isLiked || false}
+        onLike={onLike || (() => {})}
+      />
+
       {/* ===== VIDEO CONTAINER ===== */}
       {isYoutube && (
         <div
@@ -375,8 +408,11 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
 
         <div className="max-w-screen-xl mx-auto px-3 py-2 flex items-center gap-2 md:gap-4">
 
-          {/* === Left: Track info === */}
-          <div className="flex items-center gap-3 flex-1 min-w-0 max-w-[30%] md:max-w-[25%]">
+          {/* === Left: Track info (click to open full player) === */}
+          <button
+            onClick={() => setShowFullPlayer(true)}
+            className="flex items-center gap-3 flex-1 min-w-0 max-w-[30%] md:max-w-[25%] text-left hover:bg-white/5 rounded-md p-1 -m-1 transition"
+          >
             <div className="w-12 h-12 rounded-md bg-[#282828] flex-shrink-0 overflow-hidden">
               {track.thumbnail ? (
                 <img src={track.thumbnail} alt="" className="w-12 h-12 rounded-md object-cover" />
@@ -388,7 +424,8 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
               <p className="font-semibold text-xs md:text-sm truncate text-white">{track.titulo}</p>
               <p className="text-[10px] md:text-xs text-[#b3b3b3] truncate">{track.artista}</p>
             </div>
-          </div>
+            <ChevronUp size={14} className="text-[#6a6a6a] flex-shrink-0 hidden md:block" />
+          </button>
 
           {/* === Center: Controls === */}
           <div className="flex flex-col items-center gap-0.5 flex-1">

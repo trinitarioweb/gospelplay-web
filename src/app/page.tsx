@@ -830,6 +830,8 @@ export default function HomePage() {
         playlistContext={playlistContext}
         onNext={handleNext}
         onPrevious={handlePrevious}
+        isLiked={currentTrack ? likedSongs.has(currentTrack.id) : false}
+        onLike={toggleLike}
       />
       <AddContentModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onContentAdded={cargarDatos} />
 
