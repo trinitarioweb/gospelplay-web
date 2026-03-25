@@ -228,15 +228,60 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
     onTogglePlay();
   }, [actuallyPlaying, playerReady, onTogglePlay]);
 
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!playerRef.current || !playerReady || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+  const [isDragging, setIsDragging] = useState(false);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+
+  const seekToPosition = useCallback((clientX: number) => {
+    if (!playerRef.current || !playerReady || !duration || !progressBarRef.current) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
     const percent = x / rect.width;
     const seekTime = percent * duration;
     playerRef.current.seekTo(seekTime, true);
     setCurrentTime(seekTime);
   }, [playerReady, duration]);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    seekToPosition(e.clientX);
+  }, [seekToPosition]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    seekToPosition(e.clientX);
+  }, [seekToPosition]);
+
+  // Handle drag and release globally
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      seekToPosition(e.clientX);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches[0]) seekToPosition(e.touches[0].clientX);
+    };
+
+    const handleTouchEnd = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDragging, seekToPosition]);
 
   const cycleViewMode = () => {
     if (viewMode === 'audio') setViewMode('mini');
@@ -297,17 +342,26 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
 
       {/* ===== BOTTOM PLAYER BAR ===== */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#181818] border-t border-[#282828]">
-        {/* Progress bar */}
+        {/* Progress bar - clickable and draggable */}
         <div
-          className="w-full h-1.5 bg-[#3a3a3a] cursor-pointer group hover:h-2.5 transition-all"
+          ref={progressBarRef}
+          className={`w-full cursor-pointer group relative select-none ${isDragging ? 'h-3' : 'h-1.5 hover:h-3'} transition-all`}
           onClick={handleSeek}
+          onMouseDown={handleMouseDown}
+          onTouchStart={(e) => { setIsDragging(true); if (e.touches[0]) seekToPosition(e.touches[0].clientX); }}
         >
+          {/* Background */}
+          <div className="absolute inset-0 bg-[#3a3a3a]" />
+          {/* Fill */}
           <div
-            className="h-full bg-amber-500 group-hover:bg-amber-400 transition-colors relative"
+            className={`absolute top-0 left-0 h-full ${isDragging ? 'bg-amber-400' : 'bg-amber-500 group-hover:bg-amber-400'} transition-colors`}
             style={{ width: `${progress}%` }}
-          >
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
+          />
+          {/* Thumb */}
+          <div
+            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-md ${isDragging ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'} transition-all`}
+            style={{ left: `${progress}%` }}
+          />
         </div>
 
         <div className="max-w-screen-xl mx-auto px-3 py-2 flex items-center gap-2 md:gap-4">
