@@ -1,35 +1,44 @@
 @import "tailwindcss";
 
 :root {
-  --gp-orange: #f97316;
-  --gp-orange-dark: #ea580c;
-  --gp-orange-light: #fb923c;
-  --gp-bg: #000000;
-  --gp-surface: rgba(255, 255, 255, 0.05);
-  --gp-border: rgba(249, 115, 22, 0.2);
+  --gp-gold: #d4a843;
+  --gp-gold-dark: #b8922e;
+  --gp-gold-light: #e8c35a;
+  --gp-bg: #121212;
+  --gp-surface: #181818;
+  --gp-surface-hover: #282828;
+  --gp-surface-elevated: #1f1f1f;
+  --gp-border: rgba(255, 255, 255, 0.08);
+  --gp-text-primary: #ffffff;
+  --gp-text-secondary: #b3b3b3;
+  --gp-text-subdued: #6a6a6a;
 }
 
 body {
   background: var(--gp-bg);
-  color: #ffffff;
-  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--gp-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Scrollbar personalizado */
+/* Scrollbar - Spotify style */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(249, 115, 22, 0.3);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-/* Gradient text */
+/* Gradient text - gold version */
 .text-gradient {
-  background: linear-gradient(to right, #fb923c, #f97316);
+  background: linear-gradient(135deg, #e8c35a, #d4a843);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -42,4 +51,32 @@ body {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Spotify-style hover card lift */
+.card-hover {
+  transition: background-color 0.3s ease;
+}
+.card-hover:hover {
+  background-color: var(--gp-surface-hover);
+}
+
+/* Play button reveal on card hover */
+.card-play-btn {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.3s ease;
+}
+.group:hover .card-play-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Smooth section transitions */
+.section-fade {
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }

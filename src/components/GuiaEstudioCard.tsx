@@ -10,93 +10,87 @@ interface GuiaEstudioCardProps {
   onToggle?: () => void;
 }
 
-const tipoEmoji: Record<string, string> = {
-  musica: '🎵',
-  predicacion: '🎤',
-  estudio_biblico: '📖',
-  podcast: '🎙️',
-  testimonio: '🙌',
-  oracion: '🙏',
-};
-
 export default function GuiaEstudioCard({ guia, onPlay, expanded = false, onToggle }: GuiaEstudioCardProps) {
   return (
-    <div className="bg-white/5 border border-orange-500/20 rounded-xl overflow-hidden">
+    <div className="bg-[#181818] rounded-lg overflow-hidden hover:bg-[#1f1f1f] transition-colors">
       {/* Header */}
       <button
         onClick={onToggle}
-        className="w-full p-5 flex items-start gap-4 hover:bg-white/5 transition text-left"
+        className="w-full p-4 flex items-start gap-4 hover:bg-[#282828] transition-colors text-left"
       >
-        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0">
-          <BookOpen size={24} className="text-white" />
+        <div className="w-12 h-12 rounded-md bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center flex-shrink-0">
+          <BookOpen size={22} className="text-black" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-orange-400 font-bold mb-1">📖 {guia.pasajePrincipal}</p>
-          <h3 className="font-black text-lg leading-tight">{guia.titulo}</h3>
-          <p className="text-sm text-orange-300/60 mt-1 line-clamp-2">{guia.contexto}</p>
+          <p className="text-xs text-amber-400 font-semibold mb-1">{guia.pasajePrincipal}</p>
+          <h3 className="font-bold text-base text-white leading-tight">{guia.titulo}</h3>
+          <p className="text-sm text-[#b3b3b3] mt-1 line-clamp-2">{guia.contexto}</p>
           <div className="flex flex-wrap gap-1.5 mt-2">
             {guia.versiculosClave.slice(0, 4).map((v, i) => (
-              <span key={i} className="text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-500/30 rounded text-amber-300">
+              <span key={i} className="text-[11px] px-2 py-0.5 bg-amber-500/15 rounded text-amber-400 font-medium">
                 {v}
               </span>
             ))}
           </div>
         </div>
-        <ChevronRight size={20} className={`text-orange-400 transition-transform flex-shrink-0 mt-1 ${expanded ? 'rotate-90' : ''}`} />
+        <ChevronRight size={20} className={`text-[#6a6a6a] transition-transform flex-shrink-0 mt-1 ${expanded ? 'rotate-90' : ''}`} />
       </button>
 
-      {/* Contenido expandido */}
+      {/* Expanded content */}
       {expanded && (
-        <div className="border-t border-orange-500/20">
-          {/* Contexto */}
-          <div className="p-5 bg-orange-500/5">
-            <p className="text-sm text-orange-100/80 leading-relaxed">{guia.contexto}</p>
+        <div className="border-t border-white/5">
+          {/* Context */}
+          <div className="p-4 bg-white/[0.02]">
+            <p className="text-sm text-[#b3b3b3] leading-relaxed">{guia.contexto}</p>
           </div>
 
-          {/* Ruta de estudio */}
-          <div className="p-5">
-            <h4 className="font-bold text-sm text-orange-400 mb-4">🎯 Ruta de Estudio Recomendada</h4>
-            <div className="space-y-3">
+          {/* Study path */}
+          <div className="p-4">
+            <h4 className="font-semibold text-sm text-amber-400 mb-3">Ruta de Estudio</h4>
+            <div className="space-y-1">
               {guia.pasos.map((paso) => (
-                <div key={paso.orden} className="flex items-center gap-3 p-3 bg-white/5 border border-orange-500/10 rounded-lg hover:bg-white/10 transition">
-                  <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-sm font-bold text-orange-400 flex-shrink-0">
+                <div key={paso.orden} className="flex items-center gap-3 p-2.5 rounded-md hover:bg-[#282828] transition-colors group">
+                  <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center text-xs font-bold text-amber-400 flex-shrink-0">
                     {paso.orden}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-orange-300/60 mb-0.5">{paso.titulo}</p>
-                    <p className="font-bold text-sm truncate">{paso.contenido.titulo}</p>
-                    <p className="text-xs text-gray-400 truncate">{paso.contenido.artista}</p>
+                    <p className="text-xs text-[#6a6a6a] mb-0.5">{paso.titulo}</p>
+                    <p className="font-medium text-sm text-white truncate">{paso.contenido.titulo}</p>
+                    <p className="text-xs text-[#b3b3b3] truncate">{paso.contenido.artista}</p>
                   </div>
-                  <span className="text-lg flex-shrink-0">{tipoEmoji[paso.contenido.clasificacion.tipo]}</span>
-                  <div className="text-xs font-bold text-orange-400 flex-shrink-0">
-                    ⭐ {paso.contenido.evaluacion.puntuacionTotal}
-                  </div>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    paso.contenido.evaluacion.puntuacionTotal >= 85
+                      ? 'bg-amber-500/20 text-amber-400'
+                      : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {paso.contenido.evaluacion.puntuacionTotal}
+                  </span>
                   <button
                     onClick={() => onPlay(paso.contenido)}
-                    className="p-2 rounded-full bg-orange-500 hover:bg-orange-600 transition flex-shrink-0"
+                    className="p-2 rounded-full bg-amber-500 hover:bg-amber-400 hover:scale-105 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
                   >
-                    <Play size={14} fill="white" className="text-white" />
+                    <Play size={12} fill="black" className="text-black ml-0.5" />
                   </button>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Temas relacionados */}
-          <div className="px-5 pb-5">
-            <h4 className="font-bold text-sm text-orange-400 mb-2">📚 Temas Relacionados</h4>
-            <div className="flex flex-wrap gap-1.5 mb-4">
+          {/* Related */}
+          <div className="px-4 pb-4">
+            <h4 className="font-semibold text-sm text-[#b3b3b3] mb-2">Temas Relacionados</h4>
+            <div className="flex flex-wrap gap-1.5 mb-3">
               {guia.temasRelacionados.map((tema, i) => (
-                <span key={i} className="text-xs px-2 py-1 bg-orange-500/20 border border-orange-500/30 rounded-full text-orange-300 cursor-pointer hover:bg-orange-500/30 transition">
+                <span key={i} className="text-xs px-2.5 py-1 bg-[#282828] rounded-full text-[#b3b3b3] hover:text-white hover:bg-[#3a3a3a] transition-colors cursor-pointer">
                   {tema}
                 </span>
               ))}
             </div>
 
-            <h4 className="font-bold text-sm text-orange-400 mb-2">📖 Pasajes Conectados</h4>
+            <h4 className="font-semibold text-sm text-[#b3b3b3] mb-2">Pasajes Conectados</h4>
             <div className="flex flex-wrap gap-1.5">
               {guia.pasajesConectados.map((pasaje, i) => (
-                <span key={i} className="text-xs px-2 py-1 bg-amber-500/20 border border-amber-500/30 rounded-full text-amber-300 cursor-pointer hover:bg-amber-500/30 transition">
+                <span key={i} className="text-xs px-2.5 py-1 bg-amber-500/10 rounded-full text-amber-400/80 hover:text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer">
                   {pasaje}
                 </span>
               ))}

@@ -6,13 +6,13 @@ export const metadata: Metadata = {
   description: 'Contenido cristiano clasificado por IA teológica. Música, predicaciones, estudios bíblicos y comunidad.',
   keywords: ['música cristiana', 'predicaciones', 'estudios bíblicos', 'gospel', 'adoración'],
   manifest: '/manifest.json',
-  themeColor: '#f97316',
+  themeColor: '#d4a843',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className="bg-black text-white antialiased">
+      <body className="bg-[#121212] text-white antialiased">
         {children}
       </body>
     </html>
