@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Play, Pause, X, ExternalLink, ChevronUp, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, ExternalLink, ChevronUp, ChevronDown, Minimize2 } from 'lucide-react';
 import type { Contenido } from '@/types/content';
 
 interface MiniPlayerProps {
@@ -25,50 +25,70 @@ function extraerYouTubeId(url: string): string | null {
   return null;
 }
 
-const plataformaIcono: Record<string, string> = {
-  spotify: '🟢',
-  youtube: '🔴',
-  apple_music: '🍎',
-};
-
 export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose }: MiniPlayerProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const prevTrackId = useRef<string | null>(null);
+
+  // Auto-expandir cuando cambia el track
+  useEffect(() => {
+    if (track && track.id !== prevTrackId.current) {
+      setExpanded(true);
+      prevTrackId.current = track.id;
+    }
+  }, [track]);
 
   if (!track) return null;
 
   const youtubeId = extraerYouTubeId(track.url);
   const isYoutube = track.plataforma === 'youtube' && youtubeId;
+  const isSpotify = track.plataforma === 'spotify';
 
   return (
-    <div className={`fixed bottom-0 left-0 right-0 bg-gradient-to-r from-gray-900 to-gray-800 border-t border-orange-500 z-50 transition-all ${expanded ? 'h-80' : ''}`}>
-      {/* Video embebido (expandido) */}
+    <div className={`fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-orange-500 z-50 transition-all duration-300 ${expanded && isYoutube ? '' : ''}`}>
+      {/* Video de YouTube embebido */}
       {expanded && isYoutube && (
-        <div className="w-full h-56 bg-black">
+        <div className="relative w-full" style={{ paddingBottom: '56.25%', maxHeight: '400px' }}>
           <iframe
             src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`}
-            className="w-full h-full"
-            allow="autoplay; encrypted-media"
+            className="absolute top-0 left-0 w-full h-full"
+            style={{ maxHeight: '400px' }}
+            allow="autoplay; encrypted-media; fullscreen"
             allowFullScreen
             title={track.titulo}
           />
         </div>
       )}
 
-      {/* Barra del player */}
-      <div className="px-4 py-3 flex items-center gap-3">
+      {/* Spotify: abrir directamente */}
+      {expanded && isSpotify && (
+        <div className="p-6 text-center">
+          <p className="text-orange-300/60 text-sm mb-3">Spotify no permite reproducir embebido</p>
+          <a
+            href={track.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-6 py-3 bg-green-600 hover:bg-green-700 rounded-full font-bold text-sm transition"
+          >
+            Abrir en Spotify
+          </a>
+        </div>
+      )}
+
+      {/* Barra inferior del player */}
+      <div className="px-4 py-2 flex items-center gap-3">
+        {/* Thumbnail */}
+        <div className="w-10 h-10 rounded bg-black/20 flex items-center justify-center text-lg flex-shrink-0 overflow-hidden">
+          {track.thumbnail ? (
+            <img src={track.thumbnail} alt="" className="w-10 h-10 rounded object-cover" />
+          ) : (
+            <span>{isYoutube ? '🔴' : isSpotify ? '🟢' : '🎵'}</span>
+          )}
+        </div>
+
         {/* Info */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded bg-black/20 flex items-center justify-center text-lg flex-shrink-0">
-            {track.thumbnail ? (
-              <img src={track.thumbnail} alt="" className="w-10 h-10 rounded object-cover" />
-            ) : (
-              plataformaIcono[track.plataforma] || '🎵'
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="font-bold text-sm truncate">{track.titulo}</p>
-            <p className="text-xs text-white/70 truncate">{track.artista}</p>
-          </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm truncate">{track.titulo}</p>
+          <p className="text-xs text-white/70 truncate">{track.artista}</p>
         </div>
 
         {/* Puntuación */}
@@ -76,29 +96,12 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose }: 
           {track.evaluacion.puntuacionTotal}/100
         </div>
 
-        {/* Expandir/contraer (solo YouTube) */}
-        {isYoutube && (
-          <button onClick={() => setExpanded(!expanded)} className="p-2 hover:bg-white/10 rounded-full transition">
-            {expanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-          </button>
-        )}
-
-        {/* Play - para YouTube expande, para otros abre link */}
-        <button
-          onClick={() => {
-            if (isYoutube) {
-              setExpanded(true);
-            } else {
-              window.open(track.url, '_blank');
-            }
-            onTogglePlay();
-          }}
-          className="p-2 bg-orange-500 hover:bg-orange-600 rounded-full transition"
-        >
-          {isPlaying && expanded ? <Pause size={18} fill="white" /> : <Play size={18} fill="white" />}
+        {/* Expandir/minimizar */}
+        <button onClick={() => setExpanded(!expanded)} className="p-2 hover:bg-white/10 rounded-full transition">
+          {expanded ? <Minimize2 size={16} /> : <ChevronUp size={18} />}
         </button>
 
-        {/* Abrir en plataforma */}
+        {/* Abrir en plataforma original */}
         <a
           href={track.url}
           target="_blank"

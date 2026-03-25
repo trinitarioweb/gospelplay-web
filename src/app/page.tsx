@@ -80,9 +80,8 @@ export default function HomePage() {
   }, [searchQuery, filtros.tipo, filtros.esCongreacional]);
 
   const playTrack = (track: Contenido) => {
-    if (track.url) {
-      window.open(track.url, '_blank');
-    }
+    setCurrentTrack(track);
+    setIsPlaying(true);
   };
   const toggleLike = (id: string) => {
     const n = new Set(likedSongs);
