@@ -263,6 +263,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
       if (e.touches[0]) seekToPosition(e.touches[0].clientX);
     };
 
@@ -272,7 +273,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleTouchEnd);
 
     return () => {
@@ -343,25 +344,33 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
       {/* ===== BOTTOM PLAYER BAR ===== */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#181818] border-t border-[#282828]">
         {/* Progress bar - clickable and draggable */}
+        {/* Invisible touch area (taller for easy touch) */}
         <div
           ref={progressBarRef}
-          className={`w-full cursor-pointer group relative select-none ${isDragging ? 'h-3' : 'h-1.5 hover:h-3'} transition-all`}
+          className="w-full cursor-pointer group relative select-none"
+          style={{ touchAction: 'none' }}
           onClick={handleSeek}
           onMouseDown={handleMouseDown}
-          onTouchStart={(e) => { setIsDragging(true); if (e.touches[0]) seekToPosition(e.touches[0].clientX); }}
+          onTouchStart={(e) => { e.preventDefault(); setIsDragging(true); if (e.touches[0]) seekToPosition(e.touches[0].clientX); }}
         >
-          {/* Background */}
-          <div className="absolute inset-0 bg-[#3a3a3a]" />
-          {/* Fill */}
-          <div
-            className={`absolute top-0 left-0 h-full ${isDragging ? 'bg-amber-400' : 'bg-amber-500 group-hover:bg-amber-400'} transition-colors`}
-            style={{ width: `${progress}%` }}
-          />
-          {/* Thumb */}
-          <div
-            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-md ${isDragging ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'} transition-all`}
-            style={{ left: `${progress}%` }}
-          />
+          {/* Touch target area - invisible but tall */}
+          <div className="h-6 relative flex items-end">
+            {/* Visible bar */}
+            <div className={`w-full relative ${isDragging ? 'h-2' : 'h-1 group-hover:h-2'} transition-all`}>
+              {/* Background */}
+              <div className="absolute inset-0 bg-[#3a3a3a] rounded-full" />
+              {/* Fill */}
+              <div
+                className={`absolute top-0 left-0 h-full rounded-full ${isDragging ? 'bg-amber-400' : 'bg-amber-500 group-hover:bg-amber-400'} transition-colors`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            {/* Thumb */}
+            <div
+              className={`absolute bottom-0 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-lg ${isDragging ? 'opacity-100 scale-125' : 'opacity-0 group-hover:opacity-100'} transition-all`}
+              style={{ left: `${progress}%`, marginBottom: '-4px' }}
+            />
+          </div>
         </div>
 
         <div className="max-w-screen-xl mx-auto px-3 py-2 flex items-center gap-2 md:gap-4">
