@@ -88,12 +88,15 @@ export async function clasificarContenido(
 } | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
+  console.log('🔑 API Key presente:', !!apiKey, apiKey ? `${apiKey.substring(0, 10)}...` : 'NO');
+
   if (!apiKey || apiKey === 'tu-api-key-aqui') {
     console.log('⚠️  No hay API key de Anthropic, usando clasificación de ejemplo');
     return clasificacionEjemplo(titulo, artista);
   }
 
   try {
+    console.log('🤖 Llamando a Claude API para clasificar:', titulo);
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -112,13 +115,18 @@ export async function clasificarContenido(
     });
 
     if (!response.ok) {
-      console.error('Error de Claude API:', response.status);
+      const errBody = await response.text();
+      console.error('❌ Error de Claude API:', response.status, errBody);
       return clasificacionEjemplo(titulo, artista);
     }
 
     const data = await response.json();
+    console.log('✅ Respuesta de Claude recibida');
     const text = data.content[0].text;
-    const resultado = JSON.parse(text);
+
+    // Limpiar posibles backticks de markdown
+    const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const resultado = JSON.parse(cleanText);
 
     // Calcular puntuación total
     const ev = resultado.evaluacion;
@@ -127,9 +135,10 @@ export async function clasificarContenido(
     );
     ev.aprobado = ev.puntuacionTotal >= 70;
 
+    console.log('✅ Clasificación exitosa:', resultado.clasificacion?.tipo, resultado.clasificacion?.generoMusical, ev.puntuacionTotal);
     return resultado;
   } catch (error) {
-    console.error('Error al clasificar:', error);
+    console.error('❌ Error al clasificar:', error);
     return clasificacionEjemplo(titulo, artista);
   }
 }
