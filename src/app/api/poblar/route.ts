@@ -13,55 +13,75 @@ interface YouTubeSearchResult {
   author: string;
 }
 
-// Search YouTube videos using Invidious API (free, no key needed)
+// Search YouTube by scraping search results page (no API key needed)
 async function buscarYouTube(query: string, maxResults = 5): Promise<YouTubeSearchResult[]> {
-  const instances = [
-    'https://vid.puffyan.us',
-    'https://invidious.fdn.fr',
-    'https://inv.tux.pizza',
-  ];
+  try {
+    // sp=EgIQAQ%3D%3D filters for videos only
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAQ%3D%3D`;
+    const res = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return [];
 
-  for (const instance of instances) {
-    try {
-      const res = await fetch(
-        `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort_by=relevance`,
-        { signal: AbortSignal.timeout(10000) }
-      );
-      if (!res.ok) continue;
-      const data = await res.json();
-      return data
-        .filter((item: { type: string }) => item.type === 'video')
-        .slice(0, maxResults)
-        .map((item: { videoId: string; title: string; author: string }) => ({
-          videoId: item.videoId,
-          title: item.title,
-          author: item.author,
-        }));
-    } catch {
-      continue;
+    const html = await res.text();
+
+    // Extract ytInitialData JSON from the page
+    const dataMatch = html.match(/var ytInitialData = (\{[\s\S]*?\});<\/script>/);
+    if (!dataMatch) {
+      // Fallback: extract videoIds directly from HTML
+      const idMatches: string[] = [];
+      const re = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+      let m;
+      while ((m = re.exec(html)) !== null) idMatches.push(m[1]);
+      const videoIds = [...new Set(idMatches)];
+      const results: YouTubeSearchResult[] = [];
+      for (const videoId of videoIds.slice(0, maxResults)) {
+        const meta = await obtenerMetaOEmbed(videoId);
+        if (meta) results.push({ videoId, title: meta.title, author: meta.author });
+      }
+      return results;
     }
-  }
 
-  // Fallback: try Piped API
+    // Parse ytInitialData to get video info
+    const ytData = JSON.parse(dataMatch[1]);
+    const contents = ytData?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
+
+    const results: YouTubeSearchResult[] = [];
+    for (const item of contents) {
+      const video = item.videoRenderer;
+      if (!video?.videoId) continue;
+      results.push({
+        videoId: video.videoId,
+        title: video.title?.runs?.[0]?.text || '',
+        author: video.ownerText?.runs?.[0]?.text || '',
+      });
+      if (results.length >= maxResults) break;
+    }
+
+    return results;
+  } catch (e) {
+    console.error('[Poblar] Error buscando YouTube:', e);
+    return [];
+  }
+}
+
+// Get video metadata via YouTube oEmbed
+async function obtenerMetaOEmbed(videoId: string): Promise<{ title: string; author: string } | null> {
   try {
     const res = await fetch(
-      `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`,
-      { signal: AbortSignal.timeout(10000) }
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { signal: AbortSignal.timeout(5000) }
     );
-    if (res.ok) {
-      const data = await res.json();
-      return (data.items || [])
-        .slice(0, maxResults)
-        .map((item: { url: string; title: string; uploaderName: string }) => ({
-          videoId: item.url?.replace('/watch?v=', '') || '',
-          title: item.title,
-          author: item.uploaderName,
-        }))
-        .filter((item: YouTubeSearchResult) => item.videoId);
-    }
-  } catch {}
-
-  return [];
+    if (!res.ok) return null;
+    const data = await res.json();
+    return { title: data.title || '', author: data.author_name || '' };
+  } catch {
+    return null;
+  }
 }
 
 // Classify content using Claude AI
@@ -276,7 +296,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET: Populate all artists at once
+// GET: List all artists with their content counts
 export async function GET() {
   try {
     const { data: artistas, error } = await supabase
@@ -289,72 +309,9 @@ export async function GET() {
       return NextResponse.json({ error: 'No hay artistas' }, { status: 500 });
     }
 
-    const results: { artista: string; agregados: number; error?: string }[] = [];
-
-    for (const artista of artistas) {
-      try {
-        // Check how many songs this artist already has
-        const { count } = await supabase
-          .from('contenido')
-          .select('*', { count: 'exact', head: true })
-          .eq('artista_id', artista.slug); // This won't work correctly, need artist id
-
-        if ((count || 0) >= 5) {
-          results.push({ artista: artista.nombre, agregados: 0 });
-          continue;
-        }
-
-        const searchQuery = `${artista.nombre} música cristiana oficial`;
-        const videos = await buscarYouTube(searchQuery, 5);
-
-        let added = 0;
-        for (const video of videos) {
-          const url = `https://www.youtube.com/watch?v=${video.videoId}`;
-
-          const { data: existe } = await supabase
-            .from('contenido')
-            .select('id')
-            .eq('url', url)
-            .single();
-
-          if (existe) continue;
-
-          const { track, artist } = limpiarMetadata(video.title, video.author);
-          const thumbnail = `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`;
-          const clasificacion = await clasificarConIA(track, artist);
-          if (!clasificacion) continue;
-
-          const { error: insertError } = await supabase.from('contenido').insert({
-            url,
-            plataforma: 'youtube',
-            titulo: track,
-            artista: artist || artista.nombre,
-            artista_id: undefined, // Need actual UUID
-            descripcion: `${track} - ${artist || artista.nombre}`,
-            thumbnail,
-            duracion: '',
-            ...clasificacion,
-            versiculos_clave: [],
-            personajes: [],
-            doctrina: [],
-            publicado: true,
-            revisado_por_ia: true,
-          });
-
-          if (!insertError) added++;
-          await new Promise(r => setTimeout(r, 300));
-        }
-
-        results.push({ artista: artista.nombre, agregados: added });
-        console.log(`[Poblar] ${artista.nombre}: ${added} canciones`);
-      } catch (e) {
-        results.push({ artista: artista.nombre, agregados: 0, error: String(e) });
-      }
-    }
-
     return NextResponse.json({
-      total_artistas: artistas.length,
-      resultados: results,
+      total: artistas.length,
+      artistas: artistas.map(a => a.slug),
     });
   } catch (error) {
     console.error('[Poblar] Error general:', error);
