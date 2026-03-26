@@ -27,6 +27,7 @@ interface FullPlayerProps {
   isOpen: boolean;
   onClose: () => void;
   onTogglePlay: () => void;
+  onHideVideo?: (hide: boolean) => void;
   onNext?: () => void;
   onPrevious?: () => void;
   playlistContext?: PlaylistContext | null;
@@ -39,6 +40,7 @@ interface FullPlayerProps {
   showVideo: boolean;
   onToggleVideo: () => void;
 }
+
 
 interface YTPlayer {
   playVideo: () => void;
@@ -90,7 +92,7 @@ function parseSyncedLyrics(text: string): SyncedLine[] {
 }
 
 export default function FullPlayer({
-  track, isPlaying, isOpen, onClose, onTogglePlay,
+  track, isPlaying, isOpen, onClose, onTogglePlay, onHideVideo,
   onNext, onPrevious, playlistContext,
   playerRef, currentTime, duration, onSeek,
   isLiked, onLike, showVideo, onToggleVideo,
@@ -234,6 +236,11 @@ export default function FullPlayer({
     }
   }, [currentLyricIndex, showFullLyrics]);
 
+  // Notify parent to hide video when queue is showing
+  useEffect(() => {
+    onHideVideo?.(showQueue);
+  }, [showQueue, onHideVideo]);
+
   // Load playlists when add menu opens
   useEffect(() => {
     if (showAddPlaylist) {
@@ -362,7 +369,7 @@ export default function FullPlayer({
       </div>
 
       {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0 relative z-[77]">
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0 relative z-10">
         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition">
           <ChevronDown size={24} className="text-white" />
         </button>
@@ -381,12 +388,9 @@ export default function FullPlayer({
         </button>
       </div>
 
-      {/* Cover video iframe when queue is showing */}
-      {showQueue && <div className="fixed inset-0 bg-[#121212] z-[75]" />}
-
       {/* ===== MAIN CONTENT ===== */}
       {showQueue ? (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-[76]">
+        <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-10">
           <h3 className="text-lg font-bold text-white mb-3">Cola de reproduccion</h3>
           {hasPlaylist ? (
             <div className="space-y-1">
@@ -426,20 +430,22 @@ export default function FullPlayer({
             </div>
           )}
 
-          {/* Video toggle button - floats above everything */}
+          {/* Video toggle - below video/thumbnail area */}
           {isYoutube && (
-            <div className="w-full max-w-md flex justify-end -mt-12 mb-2 pr-2 relative z-[90]">
+            <div className="w-full max-w-md flex justify-center mb-2 flex-shrink-0">
               <button
                 onClick={onToggleVideo}
-                className="p-2.5 bg-black/80 rounded-full hover:bg-black/95 transition flex items-center gap-1.5 shadow-lg"
-                title={showVideo ? 'Desactivar video' : 'Activar video'}
+                className="px-4 py-1.5 bg-white/10 rounded-full hover:bg-white/20 transition flex items-center gap-2"
               >
                 {showVideo ? (
-                  <VideoOff size={18} className="text-white" />
+                  <>
+                    <VideoOff size={16} className="text-white" />
+                    <span className="text-white text-xs font-medium">Solo audio</span>
+                  </>
                 ) : (
                   <>
-                    <Video size={18} className="text-white" />
-                    <span className="text-white text-xs font-medium pr-0.5">Video</span>
+                    <Video size={16} className="text-white" />
+                    <span className="text-white text-xs font-medium">Ver video</span>
                   </>
                 )}
               </button>

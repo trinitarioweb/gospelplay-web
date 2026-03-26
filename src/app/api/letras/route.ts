@@ -114,6 +114,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // 5. Last resort: Claude AI
+    const aiResult = await buscarConClaude(track, artist);
+    if (aiResult) {
+      console.log('[Letras] Encontrada via Claude AI');
+      return NextResponse.json({
+        letras: aiResult,
+        sincronizada: false,
+        encontrada: true,
+      });
+    }
+
     console.log('[Letras] No encontrada en ninguna fuente');
     return NextResponse.json({ letras: null, sincronizada: false, encontrada: false });
   } catch (error) {
@@ -155,5 +166,33 @@ async function buscarEnLyricsOvh(track: string, artist: string): Promise<string 
     if (!res.ok) return null;
     const data = await res.json();
     return data.lyrics || null;
+  } catch { return null; }
+}
+
+async function buscarConClaude(track: string, artist: string): Promise<string | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey === 'tu-api-key-aqui') return null;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 3000,
+        system: 'Eres un experto en letras de canciones. Devuelve SOLO la letra de la cancion pedida, sin encabezados como [Verso], [Coro], etc. Solo la letra pura con saltos de linea. Si no conoces la letra exacta, responde: NO_ENCONTRADA',
+        messages: [{ role: 'user', content: `Letra de "${track}" de ${artist || 'artista desconocido'}` }],
+      }),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = (data.content?.[0]?.text || '').trim();
+    if (!text || text.includes('NO_ENCONTRADA')) return null;
+    return text;
   } catch { return null; }
 }

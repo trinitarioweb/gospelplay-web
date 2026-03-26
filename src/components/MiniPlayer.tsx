@@ -80,6 +80,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
   const [actuallyPlaying, setActuallyPlaying] = useState(false);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const [showVideoInFull, setShowVideoInFull] = useState(true);
+  const [hideVideoForQueue, setHideVideoForQueue] = useState(false);
 
   const playerRef = useRef<YTPlayer | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,16 +149,21 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, youtubeId]);
 
-  // Update time
+  // Update time - always run interval when player exists, check playing inside
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (actuallyPlaying && playerRef.current) {
+    if (playerRef.current && playerReady) {
       intervalRef.current = setInterval(() => {
-        if (playerRef.current) try { setCurrentTime(playerRef.current.getCurrentTime()); } catch {}
-      }, 500);
+        if (playerRef.current) {
+          try {
+            const t = playerRef.current.getCurrentTime();
+            setCurrentTime(t);
+          } catch {}
+        }
+      }, 300);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [actuallyPlaying]);
+  }, [playerReady, actuallyPlaying]);
 
   // Cleanup
   useEffect(() => {
@@ -181,10 +187,12 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Video visible logic
+  // Video visible logic - hide when queue is showing
   const videoVisible =
-    (showFullPlayer && showVideoInFull) ||
-    (!showFullPlayer && showVideo);
+    !hideVideoForQueue && (
+      (showFullPlayer && showVideoInFull) ||
+      (!showFullPlayer && showVideo)
+    );
 
   return (
     <>
@@ -195,6 +203,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
         isOpen={showFullPlayer}
         onClose={() => setShowFullPlayer(false)}
         onTogglePlay={handlePlayPause}
+        onHideVideo={setHideVideoForQueue}
         onNext={onNext}
         onPrevious={onPrevious}
         playlistContext={playlistContext}
