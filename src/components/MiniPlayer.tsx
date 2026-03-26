@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, SkipForward, Play, Pause, Video, VideoOff, Heart } from 'lucide-react';
 import type { Contenido } from '@/types/content';
 import FullPlayer from './FullPlayer';
+import MarqueeText from './MarqueeText';
 
 interface PlaylistContext {
   nombre: string;
@@ -81,17 +82,23 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const [showVideoInFull, setShowVideoInFull] = useState(true);
   const [hideVideoForQueue, setHideVideoForQueue] = useState(false);
+  const [playerError, setPlayerError] = useState(false);
 
   const playerRef = useRef<YTPlayer | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const prevTrackId = useRef<string | null>(null);
   const containerRef = useRef<string>(`yt-player-${Date.now()}`);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const onNextRef = useRef(onNext);
+  onNextRef.current = onNext;
 
   const youtubeId = track ? extraerYouTubeId(track.url) : null;
   const isYoutube = track?.plataforma === 'youtube' && youtubeId;
 
   const hasPlaylist = playlistContext && playlistContext.items.length > 1;
   const canNext = hasPlaylist && playlistContext.currentIndex < playlistContext.items.length - 1;
+  const canNextRef = useRef(canNext);
+  canNextRef.current = canNext;
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -108,6 +115,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
     if (!track || !youtubeId || !isYoutube) return;
     if (track.id === prevTrackId.current && playerRef.current) return;
     prevTrackId.current = track.id;
+    setPlayerError(false);
 
     const createPlayer = () => {
       if (playerRef.current) {
@@ -121,13 +129,22 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
       const container = document.getElementById(containerRef.current);
       if (!container) { setTimeout(createPlayer, 200); return; }
 
+      // Timeout: if player doesn't become ready in 15s, mark as error and skip
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = setTimeout(() => {
+        setPlayerError(true);
+        if (canNextRef.current && onNextRef.current) setTimeout(() => onNextRef.current?.(), 1500);
+      }, 15000);
+
       try {
         playerRef.current = new window.YT.Player(containerRef.current, {
           videoId: youtubeId,
           playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, showinfo: 0, iv_load_policy: 3, disablekb: 1, fs: 0, playsinline: 1 },
           events: {
             onReady: (event: { target: YTPlayer }) => {
+              if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
               setPlayerReady(true);
+              setPlayerError(false);
               setDuration(event.target.getDuration());
               event.target.playVideo();
               setActuallyPlaying(true);
@@ -135,7 +152,16 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
             onStateChange: (event: { data: number; target: YTPlayer }) => {
               if (event.data === window.YT.PlayerState.PLAYING) { setActuallyPlaying(true); setDuration(event.target.getDuration()); }
               else if (event.data === window.YT.PlayerState.PAUSED) { setActuallyPlaying(false); }
-              else if (event.data === window.YT.PlayerState.ENDED) { setActuallyPlaying(false); if (canNext && onNext) onNext(); }
+              else if (event.data === window.YT.PlayerState.ENDED) {
+                setActuallyPlaying(false);
+                if (canNextRef.current && onNextRef.current) onNextRef.current();
+              }
+            },
+            onError: () => {
+              if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+              setPlayerError(true);
+              // Auto-skip to next track after a brief delay
+              if (canNextRef.current && onNextRef.current) setTimeout(() => onNextRef.current?.(), 2000);
             },
           },
         });
@@ -145,7 +171,10 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
     if (window.YT && window.YT.Player) setTimeout(createPlayer, 100);
     else window.onYouTubeIframeAPIReady = () => setTimeout(createPlayer, 100);
 
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, youtubeId]);
 
@@ -298,7 +327,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-bold text-sm truncate text-white">{track.titulo}</p>
+                <MarqueeText text={track.titulo} className="font-bold text-sm text-white" />
                 <p className="text-xs text-[#b3b3b3] truncate">{track.artista}</p>
               </div>
             </button>

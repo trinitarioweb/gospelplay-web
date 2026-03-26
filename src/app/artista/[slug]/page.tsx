@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { ArrowLeft, CheckCircle, Play, Shuffle, Heart, Share2, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { obtenerArtistaPorSlug, obtenerArtistasRelacionados } from '@/lib/database';
+import { usePlayer } from '@/context/PlayerContext';
 import type { Artista, Contenido } from '@/types/content';
 import ArtistaCard from '@/components/ArtistaCard';
 import ContentCard from '@/components/ContentCard';
@@ -31,6 +32,7 @@ const tipoLabels: Record<string, string> = {
 export default function ArtistaPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
+  const { playTrack, playFromList, toggleLike, likedSongs } = usePlayer();
   const [artista, setArtista] = useState<Artista | null>(null);
   const [relacionados, setRelacionados] = useState<Artista[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,10 +128,21 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
 
       {/* Actions */}
       <div className="px-6 py-4 flex items-center gap-4">
-        <button className="w-14 h-14 bg-amber-500 rounded-full flex items-center justify-center hover:bg-amber-400 transition shadow-lg">
+        <button
+          onClick={() => { if (canciones.length > 0) playFromList(artista.nombre, canciones, 0); }}
+          className="w-14 h-14 bg-amber-500 rounded-full flex items-center justify-center hover:bg-amber-400 transition shadow-lg"
+        >
           <Play size={28} fill="black" className="text-black ml-1" />
         </button>
-        <button className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition">
+        <button
+          onClick={() => {
+            if (canciones.length > 0) {
+              const shuffled = [...canciones].sort(() => Math.random() - 0.5);
+              playFromList(artista.nombre, shuffled, 0);
+            }
+          }}
+          className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition"
+        >
           <Shuffle size={18} />
         </button>
         <button className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition">
@@ -158,9 +171,9 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
                 contenido={cancion}
                 compact
                 index={index + 1}
-                onPlay={() => {
-                  // Will be connected to player
-                }}
+                onPlay={() => playTrack(cancion, canciones)}
+                onLike={toggleLike}
+                isLiked={likedSongs.has(cancion.id)}
               />
             ))}
           </div>

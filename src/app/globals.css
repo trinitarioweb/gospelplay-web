@@ -89,3 +89,28 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
 }
+
+/* Queue bottom sheet slide up */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Marquee scroll for long titles */
+@keyframes marqueeScroll {
+  0%, 10% { transform: translateX(0); }
+  90%, 100% { transform: translateX(calc(-100% + var(--marquee-width))); }
+}
+.marquee-container {
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to right, transparent, black 4px, black calc(100% - 16px), transparent);
+}
+.marquee-scroll {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marqueeScroll 8s ease-in-out infinite alternate;
+}

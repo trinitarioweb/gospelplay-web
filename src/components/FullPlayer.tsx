@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { Contenido } from '@/types/content';
 import { obtenerPlaylists, agregarAPlaylist, crearPlaylist } from '@/lib/database';
+import MarqueeText from './MarqueeText';
 import type { Playlist } from '@/types/content';
 
 interface PlaylistContext {
@@ -388,33 +389,54 @@ export default function FullPlayer({
         </button>
       </div>
 
-      {/* ===== MAIN CONTENT ===== */}
-      {showQueue ? (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-10">
-          <h3 className="text-lg font-bold text-white mb-3">Cola de reproduccion</h3>
-          {hasPlaylist ? (
-            <div className="space-y-1">
-              {playlistContext.items.map((item, idx) => (
-                <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg transition ${idx === playlistContext.currentIndex ? 'bg-amber-500/15' : 'hover:bg-white/5'}`}>
-                  <span className={`text-sm font-bold w-6 text-right ${idx === playlistContext.currentIndex ? 'text-amber-400' : 'text-[#6a6a6a]'}`}>{idx + 1}</span>
-                  <div className="w-10 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
-                    {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-10 h-10 object-cover" /> : <div className="w-10 h-10 flex items-center justify-center text-[#6a6a6a] text-xs">&#9835;</div>}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-semibold truncate ${idx === playlistContext.currentIndex ? 'text-amber-400' : 'text-white'}`}>{item.titulo}</p>
-                    <p className="text-xs text-[#b3b3b3] truncate">{item.artista}</p>
-                  </div>
+      {/* ===== QUEUE BOTTOM SHEET OVERLAY ===== */}
+      {showQueue && (
+        <div className="absolute inset-0 z-20 flex flex-col justify-end" onClick={() => setShowQueue(false)}>
+          {/* Backdrop - only covers top half */}
+          <div className="absolute inset-0 bg-black/60" />
+          {/* Sheet - exactly bottom half */}
+          <div
+            className="relative bg-[#1a1a1a] rounded-t-2xl h-[50vh] flex flex-col animate-slide-up border-t border-white/10"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <div className="px-4 pb-2 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-bold text-white">Cola de reproduccion</h3>
+              <button onClick={() => setShowQueue(false)} className="p-1.5 hover:bg-white/10 rounded-full transition text-[#b3b3b3]">
+                <ChevronDown size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
+              {hasPlaylist ? (
+                <div className="space-y-1">
+                  {playlistContext.items.map((item, idx) => (
+                    <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg transition ${idx === playlistContext.currentIndex ? 'bg-amber-500/15' : 'hover:bg-white/5'}`}>
+                      <span className={`text-sm font-bold w-6 text-right ${idx === playlistContext.currentIndex ? 'text-amber-400' : 'text-[#6a6a6a]'}`}>{idx + 1}</span>
+                      <div className="w-10 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
+                        {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-10 h-10 object-cover" /> : <div className="w-10 h-10 flex items-center justify-center text-[#6a6a6a] text-xs">&#9835;</div>}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm font-semibold truncate ${idx === playlistContext.currentIndex ? 'text-amber-400' : 'text-white'}`}>{item.titulo}</p>
+                        <p className="text-xs text-[#b3b3b3] truncate">{item.artista}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="text-center py-12 text-[#6a6a6a]">
+                  <ListMusic className="mx-auto mb-3" size={40} />
+                  <p className="text-sm">No hay cola de reproduccion</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="text-center py-12 text-[#6a6a6a]">
-              <ListMusic className="mx-auto mb-3" size={40} />
-              <p className="text-sm">No hay cola de reproduccion</p>
-            </div>
-          )}
+          </div>
         </div>
-      ) : (
+      )}
+
+      {/* ===== MAIN CONTENT ===== */}
         <div className="flex-1 flex flex-col items-center px-6 pb-2 overflow-y-auto relative z-10">
           {/* Video area - spacer for iframe overlay from MiniPlayer */}
           {isYoutube && showVideo && (
@@ -474,7 +496,7 @@ export default function FullPlayer({
           {/* Title & Artist */}
           <div className="w-full max-w-md mb-4 flex-shrink-0 flex items-center justify-between">
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl md:text-2xl font-extrabold text-white truncate">{track.titulo}</h2>
+              <MarqueeText text={track.titulo} className="text-xl md:text-2xl font-extrabold text-white" />
               <p className="text-sm text-[#b3b3b3] mt-0.5">{track.artista}</p>
             </div>
             <button
@@ -576,7 +598,6 @@ export default function FullPlayer({
             Puntuacion teologica: {track.evaluacion.puntuacionTotal}/100
           </div>
         </div>
-      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Search, BookOpen, Users, Music, Flame, Radio, X, Library, ListMusic, Plus } from 'lucide-react';
+import { Home, Search, BookOpen, Music, Flame, Radio, X, Library, ListMusic, Plus, Film, Podcast, BookMarked } from 'lucide-react';
 import type { Playlist } from '@/types/content';
 
 interface SidebarProps {
@@ -20,11 +20,13 @@ const navItems = [
   { icon: Flame, label: 'Trending', id: 'trending' },
 ];
 
-const libraryItems = [
-  { icon: Music, label: 'Música', id: 'home' },
-  { icon: Radio, label: 'Predicaciones', id: 'predicadores' },
+const sectionItems = [
+  { icon: Music, label: 'Musica', id: 'musica' },
+  { icon: Radio, label: 'Predicas', id: 'predicas' },
+  { icon: Film, label: 'Series y Peliculas', id: 'series' },
+  { icon: Podcast, label: 'Podcasts', id: 'podcasts' },
+  { icon: BookMarked, label: 'Libros', id: 'libros' },
   { icon: BookOpen, label: 'Estudios', id: 'estudios' },
-  { icon: Users, label: 'Comunidades', id: 'comunidades' },
   { icon: Library, label: 'Mi Biblioteca', id: 'biblioteca' },
 ];
 
@@ -71,17 +73,17 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, pl
           </nav>
         </div>
 
-        {/* Library section */}
+        {/* Sections */}
         <div className="bg-[#121212] rounded-lg flex-1 flex flex-col overflow-hidden">
           <div className="flex items-center gap-2 px-5 pt-4 pb-2">
             <Library size={22} className="text-[#b3b3b3]" />
-            <span className="font-bold text-sm text-[#b3b3b3]">Tu biblioteca</span>
+            <span className="font-bold text-sm text-[#b3b3b3]">Secciones</span>
           </div>
 
           <nav className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
-            {libraryItems.map(item => (
+            {sectionItems.map(item => (
               <button
-                key={item.id + item.label}
+                key={item.id}
                 onClick={() => { setActiveTab(item.id); setIsOpen(false); }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm ${
                   activeTab === item.id && !activePlaylistId
