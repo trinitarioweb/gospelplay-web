@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clasificarContenido } from '@/lib/clasificador-ia';
+import { limpiarMetadata } from '@/lib/limpiar-metadata';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,10 +13,19 @@ export async function POST(request: NextRequest) {
     // 1. Extraer metadata real del video/canción
     const metadata = await extraerMetadata(url);
 
-    // 2. Clasificar con IA
-    const resultado = await clasificarContenido(
+    // 2. Limpiar título y artista (quitar "Official Video", "VEVO", etc.)
+    const { track: tituloLimpio, artist: artistaLimpio } = limpiarMetadata(
       metadata.titulo,
-      metadata.artista,
+      metadata.artista
+    );
+
+    console.log('[Clasificar] Original:', metadata.titulo, '-', metadata.artista);
+    console.log('[Clasificar] Limpio:', tituloLimpio, '-', artistaLimpio);
+
+    // 3. Clasificar con IA (usar nombres limpios)
+    const resultado = await clasificarContenido(
+      tituloLimpio,
+      artistaLimpio,
       metadata.descripcion
     );
 
@@ -23,12 +33,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error al clasificar' }, { status: 500 });
     }
 
-    // 3. Devolver todo junto
+    // 4. Devolver con títulos limpios
     return NextResponse.json({
       url,
       plataforma: detectarPlataforma(url),
-      titulo: metadata.titulo,
-      artista: metadata.artista,
+      titulo: tituloLimpio,
+      artista: artistaLimpio,
       descripcion: metadata.descripcion,
       thumbnail: metadata.thumbnail,
       duracion: metadata.duracion,
