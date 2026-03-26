@@ -459,3 +459,130 @@ export async function eliminarPlaylist(id: string): Promise<boolean> {
   if (error) { console.error('Error eliminando playlist:', error); return false; }
   return true;
 }
+
+// ===== HISTORIAL DE ESCUCHA =====
+
+export async function registrarEscucha(
+  sessionId: string,
+  contenidoId: string,
+  artistaId: string | null,
+  genero: string,
+  energia: string,
+  categoria: string,
+  duracion: number,
+  completada: boolean
+) {
+  const { error } = await supabase.from('historial_escucha').insert({
+    session_id: sessionId,
+    contenido_id: contenidoId,
+    artista_id: artistaId,
+    genero,
+    energia,
+    categoria,
+    duracion_escuchada: duracion,
+    completada,
+  });
+
+  if (error) {
+    console.error('Error registrando escucha:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function obtenerHistorial(sessionId: string, limit = 50) {
+  const { data, error } = await supabase
+    .from('historial_escucha')
+    .select('*, contenido(*)')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) { console.error('Error obteniendo historial:', error); return []; }
+
+  return (data || []).map(row => ({
+    id: row.id,
+    contenido: row.contenido ? filaAContenido(row.contenido) : null,
+    genero: row.genero,
+    energia: row.energia,
+    categoria: row.categoria,
+    duracion_escuchada: row.duracion_escuchada,
+    completada: row.completada,
+    created_at: row.created_at,
+  }));
+}
+
+export async function obtenerRecomendaciones(sessionId: string) {
+  // Get listening history to build preference profile
+  const { data: historial } = await supabase
+    .from('historial_escucha')
+    .select('contenido_id, genero, energia, categoria, artista_id, completada')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (!historial || historial.length === 0) {
+    // No history: return top-rated content
+    const { data } = await supabase
+      .from('contenido')
+      .select('*')
+      .eq('publicado', true)
+      .eq('eval_aprobado', true)
+      .order('eval_puntuacion_total', { ascending: false })
+      .limit(20);
+
+    return (data || []).map(filaAContenido);
+  }
+
+  // Build preference profile from completed listens
+  const generos: Record<string, number> = {};
+  const escuchados = new Set<string>();
+
+  for (const h of historial) {
+    escuchados.add(h.contenido_id);
+    if (h.completada && h.genero) {
+      generos[h.genero] = (generos[h.genero] || 0) + 1;
+    }
+  }
+
+  const topGeneros = Object.entries(generos)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([g]) => g);
+
+  if (topGeneros.length === 0) topGeneros.push('worship');
+
+  const { data } = await supabase
+    .from('contenido')
+    .select('*')
+    .in('genero_musical', topGeneros)
+    .eq('publicado', true)
+    .eq('eval_aprobado', true)
+    .order('eval_puntuacion_total', { ascending: false })
+    .limit(40);
+
+  const filtrado = (data || [])
+    .filter(c => !escuchados.has(c.id))
+    .slice(0, 20);
+
+  return filtrado.map(filaAContenido);
+}
+
+export async function obtenerTopGeneros(sessionId: string) {
+  const { data, error } = await supabase
+    .from('historial_escucha')
+    .select('genero')
+    .eq('session_id', sessionId)
+    .eq('completada', true);
+
+  if (error || !data) { console.error('Error obteniendo top generos:', error); return []; }
+
+  const counts: Record<string, number> = {};
+  for (const row of data) {
+    if (row.genero) counts[row.genero] = (counts[row.genero] || 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([genero, escuchas]) => ({ genero, escuchas }));
+}

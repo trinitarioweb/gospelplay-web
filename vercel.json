@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/bot/descubrir",
+      "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/bot/actualizar",
+      "schedule": "0 4 * * 1"
+    }
+  ]
+}
