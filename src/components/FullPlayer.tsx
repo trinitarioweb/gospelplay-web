@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronDown, SkipBack, SkipForward, Play, Pause, Shuffle, Repeat,
-  ListPlus, ListMusic, Share2, Video, VideoOff, Heart, ExternalLink, Loader2
+  ListPlus, ListMusic, Share2, Video, VideoOff, Heart, ExternalLink, Loader2,
+  Speaker, Smartphone
 } from 'lucide-react';
 import type { Contenido } from '@/types/content';
 import { obtenerPlaylists, agregarAPlaylist, crearPlaylist } from '@/lib/database';
@@ -84,6 +85,7 @@ export default function FullPlayer({
   const [showFullLyrics, setShowFullLyrics] = useState(false);
   const [lyricsLoading, setLyricsLoading] = useState(false);
   const [lyricsText, setLyricsText] = useState<string | null>(null);
+  const [lyricsError, setLyricsError] = useState<string | null>(null);
   const [lyricsCachedFor, setLyricsCachedFor] = useState<string | null>(null);
 
   const progressRef = useRef<HTMLDivElement>(null);
@@ -103,30 +105,58 @@ export default function FullPlayer({
     if (!isOpen) return;
     if (lyricsCachedFor === track.id) return;
 
+    let cancelled = false;
+
     const fetchLyrics = async () => {
       setLyricsLoading(true);
       setLyricsText(null);
+      setLyricsError(null);
+
       try {
+        console.log('[Lyrics] Fetching for:', track.titulo, '-', track.artista);
         const res = await fetch('/api/letras', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ titulo: track.titulo, artista: track.artista }),
         });
-        const data = await res.json();
-        if (data.encontrada && data.letras) {
-          setLyricsText(data.letras);
-        } else {
-          setLyricsText(null);
+
+        console.log('[Lyrics] Response status:', res.status);
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error('[Lyrics] Error response:', errText);
+          if (!cancelled) {
+            setLyricsError('Error al buscar letra');
+          }
+          return;
         }
-        setLyricsCachedFor(track.id);
-      } catch {
-        setLyricsText(null);
+
+        const data = await res.json();
+        console.log('[Lyrics] Data received:', { encontrada: data.encontrada, length: data.letras?.length });
+
+        if (!cancelled) {
+          if (data.letras && data.letras.length > 10) {
+            setLyricsText(data.letras);
+          } else {
+            setLyricsError('Letra no disponible');
+          }
+          setLyricsCachedFor(track.id);
+        }
+      } catch (err) {
+        console.error('[Lyrics] Fetch error:', err);
+        if (!cancelled) {
+          setLyricsError('Error de conexion');
+        }
       } finally {
-        setLyricsLoading(false);
+        if (!cancelled) {
+          setLyricsLoading(false);
+        }
       }
     };
 
     fetchLyrics();
+
+    return () => { cancelled = true; };
   }, [isOpen, track.id, track.titulo, track.artista, lyricsCachedFor]);
 
   // Load playlists when add menu opens
@@ -228,10 +258,10 @@ export default function FullPlayer({
 
   if (!isOpen) return null;
 
-  // Full lyrics overlay
-  if (showFullLyrics) {
+  // ===== FULL LYRICS VIEW =====
+  if (showFullLyrics && lyricsText) {
     return (
-      <div className="fixed inset-0 z-[60] bg-[#121212] flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-[60] bg-gradient-to-b from-[#1a1a2e] to-[#121212] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
           <button onClick={() => setShowFullLyrics(false)} className="p-2 hover:bg-white/10 rounded-full transition">
@@ -293,8 +323,9 @@ export default function FullPlayer({
     );
   }
 
+  // ===== MAIN PLAYER VIEW =====
   return (
-    <div className="fixed inset-0 z-[60] bg-[#121212] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-gradient-to-b from-[#1a1a2e] to-[#121212] flex flex-col overflow-hidden">
       {/* ===== HEADER ===== */}
       <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition">
@@ -340,7 +371,7 @@ export default function FullPlayer({
                     {item.thumbnail ? (
                       <img src={item.thumbnail} alt="" className="w-10 h-10 object-cover" />
                     ) : (
-                      <div className="w-10 h-10 flex items-center justify-center text-[#6a6a6a] text-xs">♪</div>
+                      <div className="w-10 h-10 flex items-center justify-center text-[#6a6a6a] text-xs">&#9835;</div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -362,45 +393,48 @@ export default function FullPlayer({
       ) : (
         /* Player view */
         <div className="flex-1 flex flex-col items-center px-6 pb-2 overflow-y-auto">
-          {/* Video area - spacer for the real iframe that overlays from MiniPlayer */}
+          {/* Video area - spacer for iframe overlay from MiniPlayer */}
           {isYoutube && showVideo && (
-            <div className="w-full max-w-md aspect-video rounded-xl overflow-hidden bg-black mb-2 flex-shrink-0 mt-2 relative">
-              {/* The actual iframe is positioned here by MiniPlayer */}
-              {/* Video toggle button */}
+            <div className="w-full max-w-md aspect-video rounded-xl bg-black mb-2 flex-shrink-0 mt-2 relative">
+              {/* Video toggle - turn off */}
               <button
                 onClick={onToggleVideo}
-                className="absolute top-3 right-3 p-2 bg-black/60 rounded-full hover:bg-black/80 transition z-10"
+                className="absolute top-3 right-3 p-2.5 bg-black/70 rounded-full hover:bg-black/90 transition z-[80]"
+                title="Desactivar video"
               >
-                <VideoOff size={16} className="text-white" />
+                <VideoOff size={18} className="text-white" />
               </button>
             </div>
           )}
 
           {/* Thumbnail when video is off */}
           {(!isYoutube || !showVideo) && (
-            <div className="w-full max-w-md aspect-video rounded-xl overflow-hidden bg-black mb-2 flex-shrink-0 mt-2 relative">
-              <div className="w-full h-full bg-gradient-to-br from-[#282828] to-[#181818] flex items-center justify-center">
+            <div className="w-full max-w-md rounded-xl overflow-hidden bg-black mb-2 flex-shrink-0 mt-2 relative shadow-2xl shadow-black/50">
+              <div className="w-full aspect-square max-h-[360px] bg-gradient-to-br from-[#282828] to-[#181818] flex items-center justify-center">
                 {track.thumbnail ? (
                   <img src={track.thumbnail} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-6xl text-[#3a3a3a]">&#9835;</div>
                 )}
               </div>
+              {/* Video toggle - turn on */}
               {isYoutube && (
                 <button
                   onClick={onToggleVideo}
-                  className="absolute top-3 right-3 p-2 bg-black/60 rounded-full hover:bg-black/80 transition z-10"
+                  className="absolute top-3 right-3 p-2.5 bg-black/70 rounded-full hover:bg-black/90 transition z-10 flex items-center gap-1.5"
+                  title="Activar video"
                 >
-                  <Video size={16} className="text-white" />
+                  <Video size={18} className="text-white" />
+                  <span className="text-white text-xs font-medium pr-1">Video</span>
                 </button>
               )}
             </div>
           )}
 
-          {/* === CURRENT LYRIC LINE (tap to open full lyrics) === */}
+          {/* === CURRENT LYRIC LINE === */}
           <button
             onClick={() => lyricsText && setShowFullLyrics(true)}
-            className="w-full max-w-md min-h-[36px] flex items-center justify-center mb-2 flex-shrink-0"
+            className="w-full max-w-md min-h-[40px] flex items-center justify-center mb-1 flex-shrink-0 rounded-lg hover:bg-white/5 transition"
           >
             {lyricsLoading ? (
               <span className="flex items-center gap-2 text-[#6a6a6a] text-xs">
@@ -408,18 +442,27 @@ export default function FullPlayer({
                 Buscando letra...
               </span>
             ) : currentLyricLine ? (
-              <p className="text-amber-400 text-sm font-medium text-center truncate px-4 animate-pulse-subtle">
-                {currentLyricLine}
+              <p className="text-amber-400 text-sm font-medium text-center px-4 animate-pulse-subtle">
+                &#9835; {currentLyricLine}
               </p>
-            ) : lyricsText === null && !lyricsLoading && lyricsCachedFor === track.id ? (
-              <span className="text-[#3a3a3a] text-xs">Letra no disponible</span>
+            ) : lyricsError ? (
+              <span className="text-[#3a3a3a] text-xs">{lyricsError}</span>
             ) : null}
           </button>
 
           {/* Title & Artist */}
-          <div className="w-full max-w-md text-center mb-4 flex-shrink-0">
-            <h2 className="text-xl md:text-2xl font-extrabold text-white truncate">{track.titulo}</h2>
-            <p className="text-sm text-[#b3b3b3] mt-1">{track.artista}</p>
+          <div className="w-full max-w-md mb-4 flex-shrink-0 flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl md:text-2xl font-extrabold text-white truncate">{track.titulo}</h2>
+              <p className="text-sm text-[#b3b3b3] mt-0.5">{track.artista}</p>
+            </div>
+            {/* Like button next to title (like Spotify) */}
+            <button
+              onClick={() => onLike(track.id)}
+              className={`p-2 ml-3 transition flex-shrink-0 ${isLiked ? 'text-amber-400' : 'text-[#b3b3b3] hover:text-white'}`}
+            >
+              <Heart size={22} fill={isLiked ? 'currentColor' : 'none'} />
+            </button>
           </div>
 
           {/* ===== PROGRESS BAR ===== */}
@@ -434,9 +477,9 @@ export default function FullPlayer({
             >
               <div className="h-8 relative flex items-center">
                 <div className={`w-full relative ${isDragging ? 'h-1.5' : 'h-1 group-hover:h-1.5'} transition-all`}>
-                  <div className="absolute inset-0 bg-[#3a3a3a] rounded-full" />
+                  <div className="absolute inset-0 bg-[#4a4a4a] rounded-full" />
                   <div
-                    className={`absolute top-0 left-0 h-full rounded-full ${isDragging ? 'bg-amber-400' : 'bg-amber-500 group-hover:bg-amber-400'}`}
+                    className={`absolute top-0 left-0 h-full rounded-full ${isDragging ? 'bg-amber-400' : 'bg-white group-hover:bg-amber-400'}`}
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -453,7 +496,7 @@ export default function FullPlayer({
           </div>
 
           {/* ===== MAIN CONTROLS ===== */}
-          <div className="flex items-center justify-center gap-6 md:gap-8 mb-4 w-full max-w-md">
+          <div className="flex items-center justify-center gap-6 md:gap-8 mb-6 w-full max-w-md">
             <button
               onClick={() => setShuffle(!shuffle)}
               className={`p-2 transition ${shuffle ? 'text-amber-400' : 'text-[#b3b3b3] hover:text-white'}`}
@@ -501,23 +544,15 @@ export default function FullPlayer({
 
           {/* ===== BOTTOM ACTIONS ===== */}
           <div className="flex items-center justify-between w-full max-w-md px-2">
-            <div className="flex items-center gap-3">
-              <button className="p-2 text-[#b3b3b3] hover:text-white transition" title="Conectar">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2 16V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12" />
-                  <rect x="6" y="16" width="12" height="6" rx="1" />
-                </svg>
-              </button>
-
-              <button
-                onClick={() => onLike(track.id)}
-                className={`p-2 transition ${isLiked ? 'text-amber-400' : 'text-[#b3b3b3] hover:text-white'}`}
-              >
-                <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
+            <div className="flex items-center gap-4">
+              {/* Connect device icon (Spotify-style) */}
+              <button className="p-2 text-[#b3b3b3] hover:text-white transition" title="Dispositivos disponibles">
+                <Speaker size={18} />
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              {/* Add to playlist */}
               <div className="relative">
                 <button
                   onClick={() => setShowAddPlaylist(!showAddPlaylist)}
@@ -550,6 +585,7 @@ export default function FullPlayer({
                 )}
               </div>
 
+              {/* Queue */}
               <button
                 onClick={() => setShowQueue(true)}
                 className="p-2 text-[#b3b3b3] hover:text-white transition"
@@ -558,6 +594,7 @@ export default function FullPlayer({
                 <ListMusic size={18} />
               </button>
 
+              {/* Share */}
               <button
                 onClick={handleShare}
                 className="p-2 text-[#b3b3b3] hover:text-white transition"
@@ -566,6 +603,7 @@ export default function FullPlayer({
                 <Share2 size={18} />
               </button>
 
+              {/* External */}
               <a
                 href={track.url}
                 target="_blank"
@@ -579,7 +617,7 @@ export default function FullPlayer({
           </div>
 
           {/* Score badge */}
-          <div className="mt-3 px-3 py-1 bg-amber-500/15 rounded-full text-xs font-bold text-amber-400">
+          <div className="mt-4 px-3 py-1 bg-amber-500/15 rounded-full text-xs font-bold text-amber-400">
             Puntuacion teologica: {track.evaluacion.puntuacionTotal}/100
           </div>
         </div>

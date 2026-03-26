@@ -7,27 +7,35 @@ El usuario te pedirá la letra de una canción. Si conoces la letra REAL de esa 
 REGLAS:
 - Devuelve la letra REAL de la canción tal como es, con sus versos, coros y puentes.
 - Usa saltos de línea simples entre versos y líneas vacías entre secciones (verso, coro, puente, etc.).
-- NO inventes letras. Si no conoces la letra exacta de la canción, responde EXACTAMENTE: "NO_ENCONTRADA"
+- NO inventes letras. Si no conoces la letra exacta de la canción, responde EXACTAMENTE con la palabra: NO_ENCONTRADA
 - NO agregues encabezados como [Verso 1], [Coro], etc. Solo la letra pura.
 - Si la canción es en inglés, devuelve la letra en inglés.
-- Si la canción es en español, devuelve la letra en español.`;
+- Si la canción es en español, devuelve la letra en español.
+- NO incluyas notas, explicaciones ni aclaraciones. SOLO la letra o NO_ENCONTRADA.`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { titulo, artista } = await request.json();
+    const body = await request.json();
+    const { titulo, artista } = body;
+
+    console.log('[API Letras] Request received:', { titulo, artista });
 
     if (!titulo) {
-      return NextResponse.json({ error: 'Se requiere un título' }, { status: 400 });
+      return NextResponse.json({ error: 'Se requiere un titulo' }, { status: 400 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
+    console.log('[API Letras] API key present:', !!apiKey);
 
     if (!apiKey || apiKey === 'tu-api-key-aqui') {
       return NextResponse.json({
-        letras: 'No se pudo buscar la letra: API key no configurada.',
+        letras: 'API key no configurada. No se puede buscar la letra.',
         encontrada: false,
       });
     }
+
+    const userMessage = `Dame la letra completa de la cancion "${titulo}" de ${artista || 'artista desconocido'}.`;
+    console.log('[API Letras] Calling Claude API...');
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -37,33 +45,34 @@ export async function POST(request: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 3000,
         system: SYSTEM_PROMPT,
         messages: [
-          {
-            role: 'user',
-            content: `Dame la letra completa de la canción "${titulo}" de ${artista || 'artista desconocido'}.`,
-          },
+          { role: 'user', content: userMessage },
         ],
       }),
     });
 
+    console.log('[API Letras] Claude response status:', response.status);
+
     if (!response.ok) {
       const errBody = await response.text();
-      console.error('Error de Claude API al buscar letra:', response.status, errBody);
+      console.error('[API Letras] Claude API error:', response.status, errBody);
       return NextResponse.json({
-        letras: 'Error al buscar la letra. Intenta de nuevo.',
+        letras: `No se pudo buscar la letra (error ${response.status}).`,
         encontrada: false,
       });
     }
 
     const data = await response.json();
-    const text: string = data.content[0].text.trim();
+    const text: string = (data.content?.[0]?.text || '').trim();
 
-    if (text === 'NO_ENCONTRADA' || text.includes('NO_ENCONTRADA')) {
+    console.log('[API Letras] Response length:', text.length, 'First 100 chars:', text.substring(0, 100));
+
+    if (!text || text === 'NO_ENCONTRADA' || text.includes('NO_ENCONTRADA')) {
       return NextResponse.json({
-        letras: `No se encontró la letra de "${titulo}" por ${artista || 'artista desconocido'}.`,
+        letras: `No se encontro la letra de "${titulo}".`,
         encontrada: false,
       });
     }
@@ -73,10 +82,10 @@ export async function POST(request: NextRequest) {
       encontrada: true,
     });
   } catch (error) {
-    console.error('Error en /api/letras:', error);
+    console.error('[API Letras] Server error:', error);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
+      { letras: 'Error interno del servidor.', encontrada: false },
+      { status: 200 }
     );
   }
 }
