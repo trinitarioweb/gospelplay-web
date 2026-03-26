@@ -12,6 +12,42 @@ import { temasPopulares, librosBiblia, necesidades } from '@/lib/datos-ejemplo';
 import ArtistaCard from '@/components/ArtistaCard';
 import type { Contenido, GuiaEstudio, Comunidad, FiltrosBusqueda, Playlist, Artista } from '@/types/content';
 
+const GENRE_COLORS: Record<string, string> = {
+  'worship': 'from-purple-600 to-purple-900',
+  'pop_cristiano': 'from-pink-500 to-pink-800',
+  'rock_cristiano': 'from-red-600 to-red-900',
+  'hip_hop_cristiano': 'from-blue-700 to-blue-950',
+  'reggaeton_cristiano': 'from-green-500 to-green-800',
+  'balada_cristiana': 'from-orange-500 to-orange-800',
+  'himnos_clasicos': 'from-yellow-600 to-yellow-900',
+  'predicacion': 'from-teal-500 to-teal-800',
+  'salsa_cristiana': 'from-rose-500 to-rose-800',
+  'soaking': 'from-indigo-500 to-indigo-800',
+};
+
+const GENRE_LABELS: Record<string, string> = {
+  'worship': 'Worship',
+  'pop_cristiano': 'Pop Cristiano',
+  'rock_cristiano': 'Rock Cristiano',
+  'hip_hop_cristiano': 'Hip-Hop Cristiano',
+  'reggaeton_cristiano': 'Reggaeton Cristiano',
+  'balada_cristiana': 'Baladas',
+  'himnos_clasicos': 'Himnos Clasicos',
+  'predicacion': 'Predicaciones',
+  'salsa_cristiana': 'Salsa Cristiana',
+  'soaking': 'Soaking',
+};
+
+// Genre-based "Hecho para ti" mixes with representative artist names
+const GENRE_MIXES: { genre: string; artists: string[] }[] = [
+  { genre: 'worship', artists: ['Maverick City', 'Hillsong', 'Bethel'] },
+  { genre: 'pop_cristiano', artists: ['Evan Craft', 'Twice', 'Alex Zurdo'] },
+  { genre: 'rock_cristiano', artists: ['Skillet', 'Rescate', 'Rojo'] },
+  { genre: 'hip_hop_cristiano', artists: ['Redimi2', 'Lecrae', 'Funky'] },
+  { genre: 'predicacion', artists: ['Paul Washer', 'John Piper'] },
+  { genre: 'balada_cristiana', artists: ['Marcos Witt', 'Jesús Adrián R.'] },
+];
+
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -23,6 +59,8 @@ export default function HomePage() {
   const [expandedGuia, setExpandedGuia] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<FiltrosBusqueda>({});
   const [seccionMusica, setSeccionMusica] = useState<'todo' | 'congregacional' | 'worship' | 'himnos' | 'urbano'>('todo');
+  const [homeFilter, setHomeFilter] = useState<'todo' | 'musica' | 'predicaciones' | 'podcasts'>('todo');
+  const [genreFilter, setGenreFilter] = useState<string | null>(null);
 
   // Datos de Supabase
   const [musica, setMusica] = useState<Contenido[]>([]);
@@ -120,10 +158,23 @@ export default function HomePage() {
   const playTrack = (track: Contenido) => {
     setCurrentTrack(track);
     setIsPlaying(true);
-    // If not playing from a playlist context, clear it
-    if (!playlistContext || !playlistContext.items.find(i => i.id === track.id)) {
-      setPlaylistContext(null);
-    }
+
+    // If already in a playlist context with this track, keep it
+    if (playlistContext?.items.find(i => i.id === track.id)) return;
+
+    // Auto-generate queue from similar songs (same genre or same artist)
+    const similar = musica.filter(m =>
+      m.id !== track.id && (
+        m.clasificacion.generoMusical === track.clasificacion.generoMusical ||
+        m.artista === track.artista
+      )
+    ).slice(0, 20);
+
+    setPlaylistContext({
+      nombre: `Radio: ${track.titulo}`,
+      items: [track, ...similar],
+      currentIndex: 0,
+    });
   };
 
   const playFromPlaylist = (playlist: Playlist, startIndex: number) => {
@@ -291,52 +342,20 @@ export default function HomePage() {
           {/* ===== HOME ===== */}
           {activeTab === 'home' && (
             <div className="section-fade">
-              {/* Hero - subtle gradient */}
-              <div className="px-4 md:px-6 pt-4 pb-6" style={{ background: 'linear-gradient(180deg, rgba(180,130,40,0.15) 0%, rgba(18,18,18,1) 100%)' }}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="text-amber-400" size={16} />
-                  <p className="text-amber-400 font-semibold text-xs uppercase tracking-widest">Curado por IA</p>
-                </div>
-                <h2 className="text-3xl md:text-4xl font-extrabold leading-tight mb-2">
-                  Contenido cristiano<br />
-                  <span className="text-gradient">verificado y clasificado</span>
-                </h2>
-                <p className="text-[#b3b3b3] text-sm max-w-lg">
-                  Cristocentrico, biblicamente fiel. Musica, predicaciones y estudios evaluados automaticamente.
-                </p>
-                <div className="flex items-center gap-5 mt-4 text-xs text-[#6a6a6a]">
-                  <span className="flex items-center gap-1.5"><CheckCircle size={14} className="text-emerald-400" /> {stats.contenidoAprobado} aprobados</span>
-                  <span className="flex items-center gap-1.5"><AlertTriangle size={14} className="text-red-400" /> {stats.contenidoRechazado} rechazados</span>
-                  <span className="flex items-center gap-1.5"><BookOpen size={14} className="text-amber-400" /> {stats.guiasGeneradas} guias</span>
-                </div>
-              </div>
-
-              {/* ====== SECTION: MUSICA ====== */}
-              <section className="px-4 md:px-6 py-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-                    <Music className="text-amber-400" size={24} />
-                    Musica
-                  </h3>
-                  <button onClick={() => handleSetActiveTab('buscar')} className="text-xs text-[#b3b3b3] hover:text-white font-bold flex items-center gap-1 transition-colors">
-                    Mostrar todo <ChevronRight size={14} />
-                  </button>
-                </div>
-
-                {/* Sub-filters - pill style */}
-                <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide pb-1">
+              {/* 1. Quick filter pills at top (Spotify-style) */}
+              <div className="px-4 md:px-6 pt-4 pb-2">
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                   {([
-                    { id: 'todo', label: 'Todas' },
-                    { id: 'congregacional', label: 'Congregacional' },
-                    { id: 'worship', label: 'Worship' },
-                    { id: 'himnos', label: 'Himnos' },
-                    { id: 'urbano', label: 'Urbano' },
+                    { id: 'todo', label: 'Todo' },
+                    { id: 'musica', label: 'Musica' },
+                    { id: 'predicaciones', label: 'Predicaciones' },
+                    { id: 'podcasts', label: 'Podcasts' },
                   ] as const).map(f => (
                     <button
                       key={f.id}
-                      onClick={() => setSeccionMusica(f.id)}
+                      onClick={() => setHomeFilter(f.id)}
                       className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                        seccionMusica === f.id
+                        homeFilter === f.id
                           ? 'bg-white text-black'
                           : 'bg-[#232323] text-white hover:bg-[#2a2a2a]'
                       }`}
@@ -345,29 +364,49 @@ export default function HomePage() {
                     </button>
                   ))}
                 </div>
+              </div>
 
-                {/* Horizontal scroll of cards */}
-                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-                  {musicaFiltrada().map(item => (
-                    <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
-                      <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
-                    </div>
-                  ))}
-                </div>
-                {musicaFiltrada().length === 0 && (
-                  <p className="text-center py-8 text-[#6a6a6a] text-sm">No hay musica en esta categoria</p>
-                )}
-              </section>
-
-              {/* ====== SECTION: ARTISTAS ====== */}
-              {artistas.length > 0 && (
+              {/* 2. "Hecho para ti" - Genre-based daily mixes */}
+              {(homeFilter === 'todo' || homeFilter === 'musica') && (
                 <section className="px-4 md:px-6 py-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-                      <Sparkles className="text-amber-400" size={24} />
-                      Artistas
-                    </h3>
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-4">Hecho para ti</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {GENRE_MIXES.map(mix => {
+                      const gradient = GENRE_COLORS[mix.genre] || 'from-gray-600 to-gray-900';
+                      const label = GENRE_LABELS[mix.genre] || mix.genre;
+                      return (
+                        <button
+                          key={mix.genre}
+                          onClick={() => {
+                            const genreSongs = musica.filter(m => m.clasificacion.generoMusical === mix.genre);
+                            if (genreSongs.length > 0) {
+                              setPlaylistContext({
+                                nombre: `Mix: ${label}`,
+                                items: genreSongs,
+                                currentIndex: 0,
+                              });
+                              setCurrentTrack(genreSongs[0]);
+                              setIsPlaying(true);
+                            }
+                          }}
+                          className={`relative overflow-hidden rounded-lg bg-gradient-to-br ${gradient} p-4 h-24 md:h-28 text-left group hover:brightness-110 transition-all`}
+                        >
+                          <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Play size={18} fill="black" className="text-black ml-0.5" />
+                          </div>
+                          <p className="font-bold text-white text-sm md:text-base">{label} Mix</p>
+                          <p className="text-white/70 text-xs mt-1 line-clamp-2">{mix.artists.join(', ')}</p>
+                        </button>
+                      );
+                    })}
                   </div>
+                </section>
+              )}
+
+              {/* 3. "Artistas populares" - Horizontal scroll */}
+              {(homeFilter === 'todo' || homeFilter === 'musica') && artistas.length > 0 && (
+                <section className="px-4 md:px-6 py-6">
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-4">Artistas populares</h3>
                   <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
                     {artistas.slice(0, 15).map(artista => (
                       <ArtistaCard
@@ -380,131 +419,67 @@ export default function HomePage() {
                 </section>
               )}
 
-              {/* ====== SECTION: ENSENANZAS ====== */}
-              <section className="px-4 md:px-6 py-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-                    <Mic className="text-amber-400" size={24} />
-                    Predicaciones
-                  </h3>
-                  <button onClick={() => handleSetActiveTab('predicadores')} className="text-xs text-[#b3b3b3] hover:text-white font-bold flex items-center gap-1 transition-colors">
-                    Mostrar todo <ChevronRight size={14} />
-                  </button>
-                </div>
-                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-                  {ensenanzas.map(item => (
-                    <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
-                      <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* ====== SECTION: ESTUDIOS BIBLICOS ====== */}
-              <section className="px-4 md:px-6 py-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
-                    <BookOpen className="text-amber-400" size={24} />
-                    Estudios Biblicos
-                  </h3>
-                  <button onClick={() => handleSetActiveTab('estudios')} className="text-xs text-[#b3b3b3] hover:text-white font-bold flex items-center gap-1 transition-colors">
-                    Mostrar todo <ChevronRight size={14} />
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {guiasEstudio.slice(0, 3).map(guia => (
-                    <GuiaEstudioCard key={guia.id} guia={guia} onPlay={playTrack} expanded={expandedGuia === guia.id} onToggle={() => setExpandedGuia(expandedGuia === guia.id ? null : guia.id)} />
-                  ))}
-                </div>
-              </section>
-
-              {/* ====== SECTION: EXPLORA POR TEMA ====== */}
-              <section className="px-4 md:px-6 py-6">
-                <h3 className="text-lg font-bold text-white mb-3">Explora por Tema</h3>
-                <div className="flex flex-wrap gap-2">
-                  {temasPopulares.map((tema, i) => (
-                    <button key={i} onClick={() => { setSearchQuery(tema); handleSetActiveTab('buscar'); }}
-                      className="px-4 py-2 bg-[#232323] rounded-full text-sm text-[#b3b3b3] hover:text-white hover:bg-[#2a2a2a] transition-colors font-medium">
-                      {tema}
+              {/* 4. "Recien agregado" - Newest songs horizontal scroll */}
+              {(homeFilter === 'todo' || homeFilter === 'musica') && (
+                <section className="px-4 md:px-6 py-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl md:text-2xl font-bold text-white">Recien agregado</h3>
+                    <button onClick={() => handleSetActiveTab('buscar')} className="text-xs text-[#b3b3b3] hover:text-white font-bold flex items-center gap-1 transition-colors">
+                      Mostrar todo <ChevronRight size={14} />
                     </button>
-                  ))}
-                </div>
-              </section>
-
-              {/* ====== SECTION: COMUNIDADES ====== */}
-              <section className="px-4 md:px-6 py-6">
-                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                  <Users className="text-amber-400" size={22} /> Comunidades
-                </h3>
-                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-                  {comunidades.map(com => (
-                    <div key={com.id} className="flex-shrink-0 w-52 bg-[#181818] rounded-lg p-4 hover:bg-[#282828] transition-colors">
-                      <div className="text-3xl mb-3">{com.imagen}</div>
-                      <p className="font-bold text-sm text-white">{com.nombre}</p>
-                      <p className="text-xs text-[#6a6a6a] mt-1">{com.miembros} miembros</p>
-                      <div className="flex items-center gap-1.5 mt-1 text-xs text-emerald-400">
-                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>{com.online} online
-                      </div>
-                      <button className="mt-3 w-full py-2 bg-white/10 hover:bg-white/15 rounded-full font-semibold text-xs text-white transition-colors">
-                        Unirse
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* ====== SECTION: BOT ACTIVITY ====== */}
-              <section className="px-4 md:px-6 py-6">
-                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-                  <Bot className="text-amber-400" size={22} /> Auto-Curacion IA
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">ACTIVO</span>
-                </h3>
-                <div className="bg-[#181818] rounded-lg p-5">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center">
-                      <p className="text-2xl font-extrabold text-amber-400">{stats.contenidoAnalizado}</p>
-                      <p className="text-xs text-[#6a6a6a]">Analizados</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-extrabold text-emerald-400">{stats.contenidoAprobado}</p>
-                      <p className="text-xs text-[#6a6a6a]">Aprobados</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-extrabold text-red-400">{stats.contenidoRechazado}</p>
-                      <p className="text-xs text-[#6a6a6a]">Rechazados</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-extrabold text-blue-400">{stats.guiasGeneradas}</p>
-                      <p className="text-xs text-[#6a6a6a]">Guias creadas</p>
-                    </div>
                   </div>
-
-                  <div className="space-y-1.5">
-                    {botLog.slice(0, 3).map(tarea => (
-                      <div key={tarea.id} className="flex items-center gap-3 p-2.5 rounded-md bg-white/[0.03] text-xs">
-                        {tarea.estado === 'completado' && <CheckCircle size={14} className="text-emerald-400 flex-shrink-0" />}
-                        {tarea.estado === 'procesando' && <Loader2 size={14} className="text-amber-400 animate-spin flex-shrink-0" />}
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate text-[#b3b3b3]">{tarea.descripcion}</p>
-                          {tarea.resultado && <p className="text-[#6a6a6a] truncate">{tarea.resultado}</p>}
-                        </div>
-                        <span className="text-[#6a6a6a] flex-shrink-0">
-                          {tarea.estado === 'procesando' ? 'ahora' : 'hace poco'}
-                        </span>
+                  <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                    {[...musica].sort((a, b) => new Date(b.fechaCreacion || 0).getTime() - new Date(a.fechaCreacion || 0).getTime()).slice(0, 12).map(item => (
+                      <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
+                        <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
                       </div>
                     ))}
                   </div>
+                </section>
+              )}
 
-                  <div className="mt-4 pt-3 border-t border-white/5">
-                    <p className="text-xs text-[#6a6a6a]">
-                      <span className="font-semibold text-amber-400">Tendencias:</span> gracia, salvacion, Espiritu Santo, identidad en Cristo, oracion
-                    </p>
-                    <p className="text-xs text-[#6a6a6a] mt-1">
-                      <span className="font-semibold text-red-400">Vacios:</span> Apocalipsis, profetas menores, matrimonio cristiano
-                    </p>
+              {/* Predicaciones horizontal scroll (when filtered to predicaciones or todo) */}
+              {(homeFilter === 'todo' || homeFilter === 'predicaciones') && (
+                <section className="px-4 md:px-6 py-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+                      <Mic className="text-amber-400" size={24} />
+                      Predicaciones
+                    </h3>
+                    <button onClick={() => handleSetActiveTab('predicadores')} className="text-xs text-[#b3b3b3] hover:text-white font-bold flex items-center gap-1 transition-colors">
+                      Mostrar todo <ChevronRight size={14} />
+                    </button>
                   </div>
-                </div>
-              </section>
+                  <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                    {ensenanzas.map(item => (
+                      <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
+                        <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* 5. "Explora generos" - Grid of genre cards */}
+              {homeFilter === 'todo' && (
+                <section className="px-4 md:px-6 py-6">
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-4">Explora generos</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {Object.entries(GENRE_LABELS).map(([key, label]) => {
+                      const gradient = GENRE_COLORS[key] || 'from-gray-600 to-gray-900';
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => { setGenreFilter(key); handleSetActiveTab('buscar'); }}
+                          className={`rounded-lg bg-gradient-to-br ${gradient} p-4 h-24 text-left hover:brightness-110 transition-all`}
+                        >
+                          <p className="font-bold text-white text-sm md:text-base">{label}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
 
               <div className="h-32"></div>
             </div>
@@ -525,9 +500,9 @@ export default function HomePage() {
                   { label: 'Estudios', value: 'estudio_biblico' },
                   { label: 'Podcasts', value: 'podcast' },
                 ].map((f, i) => (
-                  <button key={i} onClick={() => setFiltros({ ...filtros, tipo: f.value as FiltrosBusqueda['tipo'] })}
+                  <button key={i} onClick={() => { setFiltros({ ...filtros, tipo: f.value as FiltrosBusqueda['tipo'] }); setGenreFilter(null); }}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                      filtros.tipo === f.value
+                      filtros.tipo === f.value && !genreFilter
                         ? 'bg-white text-black'
                         : 'bg-[#232323] text-white hover:bg-[#2a2a2a]'
                     }`}>
@@ -535,6 +510,18 @@ export default function HomePage() {
                   </button>
                 ))}
               </div>
+
+              {/* Active genre filter badge */}
+              {genreFilter && (
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r ${GENRE_COLORS[genreFilter] || 'from-gray-600 to-gray-900'} text-white`}>
+                    {GENRE_LABELS[genreFilter] || genreFilter}
+                  </span>
+                  <button onClick={() => setGenreFilter(null)} className="text-xs text-[#b3b3b3] hover:text-white transition-colors">
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
 
               <div className="flex gap-2 mb-6">
                 <button onClick={() => setFiltros({ ...filtros, esCongreacional: filtros.esCongreacional ? undefined : true })}
@@ -547,7 +534,49 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {searchQuery ? (
+              {/* Genre filtered list view */}
+              {genreFilter && !searchQuery ? (
+                <>
+                  <h3 className="font-bold text-base mb-3 text-white">{GENRE_LABELS[genreFilter] || genreFilter}</h3>
+                  {(() => {
+                    const genreItems = todoContenido.filter(c => c.clasificacion.generoMusical === genreFilter || (genreFilter === 'predicacion' && c.clasificacion.tipo === 'predicacion'));
+                    return (
+                      <>
+                        {/* List header */}
+                        <div className="bg-[#181818] rounded-lg overflow-hidden">
+                          <div className="flex items-center gap-3 px-4 py-2 border-b border-white/5 text-xs text-[#6a6a6a] font-medium">
+                            <span className="w-8 text-center">#</span>
+                            <span className="w-12"></span>
+                            <span className="flex-1">Titulo</span>
+                            <span className="w-28 hidden sm:block">Artista</span>
+                            <span className="w-24 hidden md:block">Genero</span>
+                            <span className="w-12 text-right hidden sm:block">Score</span>
+                            <span className="w-14 text-right">Duracion</span>
+                          </div>
+                          {genreItems.map((item, idx) => (
+                            <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playTrack(item)}>
+                              <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
+                              <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
+                              <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
+                                {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#6a6a6a] text-sm">{item.clasificacion.tipo === 'musica' ? '\u266A' : '\uD83C\uDFA4'}</div>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-white truncate">{item.titulo}</p>
+                                <p className="text-xs text-[#b3b3b3] truncate sm:hidden">{item.artista}</p>
+                              </div>
+                              <span className="w-28 text-xs text-[#b3b3b3] truncate hidden sm:block">{item.artista}</span>
+                              <span className="w-24 text-xs text-[#6a6a6a] truncate hidden md:block">{GENRE_LABELS[item.clasificacion.generoMusical || ''] || item.clasificacion.generoMusical || '-'}</span>
+                              <span className="w-12 text-right hidden sm:block"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.evaluacion.puntuacionTotal >= 85 ? 'bg-amber-500/20 text-amber-400' : item.evaluacion.puntuacionTotal >= 70 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>{item.evaluacion.puntuacionTotal}</span></span>
+                              <span className="w-14 text-right text-xs text-[#6a6a6a]">{item.duracion}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {genreItems.length === 0 && <p className="text-center py-8 text-[#6a6a6a]">No hay contenido en este genero</p>}
+                      </>
+                    );
+                  })()}
+                </>
+              ) : searchQuery ? (
                 <>
                   {buscarGuias().length > 0 && (
                     <div className="mb-6">
@@ -562,14 +591,36 @@ export default function HomePage() {
 
                   <h3 className="font-bold text-base mb-3 text-white">Contenido ({resultadosBusqueda.length})</h3>
                   <div className="bg-[#181818] rounded-lg overflow-hidden">
-                    {resultadosBusqueda.map(item => (
-                      <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} compact onPlaylistsChanged={cargarPlaylists} />
+                    {resultadosBusqueda.map((item, idx) => (
+                      <div key={item.id} className="flex items-center gap-3 px-2">
+                        <span className="text-sm font-bold text-[#6a6a6a] w-6 text-right">{idx + 1}</span>
+                        <div className="flex-1"><ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} compact onPlaylistsChanged={cargarPlaylists} /></div>
+                      </div>
                     ))}
                   </div>
                   {resultadosBusqueda.length === 0 && <p className="text-center py-8 text-[#6a6a6a]">No se encontro contenido para &quot;{searchQuery}&quot;</p>}
                 </>
               ) : (
                 <>
+                  {/* Genre grid when no search query */}
+                  <section className="mb-8">
+                    <h3 className="font-bold text-base mb-3 text-white">Explora generos</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {Object.entries(GENRE_LABELS).map(([key, label]) => {
+                        const gradient = GENRE_COLORS[key] || 'from-gray-600 to-gray-900';
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setGenreFilter(key)}
+                            className={`rounded-lg bg-gradient-to-br ${gradient} p-4 h-24 text-left hover:brightness-110 transition-all`}
+                          >
+                            <p className="font-bold text-white text-sm md:text-base">{label}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
                   <div className="mb-8">
                     <h3 className="font-bold text-base mb-3 text-white">Que necesitas?</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -661,9 +712,30 @@ export default function HomePage() {
             <div className="p-4 md:p-6 max-w-4xl mx-auto section-fade">
               <h2 className="text-2xl md:text-3xl font-extrabold mb-1">Predicaciones y Ensenanzas</h2>
               <p className="text-sm text-[#6a6a6a] mb-6">Sermones evaluados teologicamente por IA</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {ensenanzas.map(item => (
-                  <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+              <div className="bg-[#181818] rounded-lg overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-2 border-b border-white/5 text-xs text-[#6a6a6a] font-medium">
+                  <span className="w-8 text-center">#</span>
+                  <span className="w-12"></span>
+                  <span className="flex-1">Titulo</span>
+                  <span className="w-28 hidden sm:block">Artista</span>
+                  <span className="w-12 text-right hidden sm:block">Score</span>
+                  <span className="w-14 text-right">Duracion</span>
+                </div>
+                {ensenanzas.map((item, idx) => (
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playTrack(item)}>
+                    <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
+                    <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
+                    <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
+                      {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#6a6a6a] text-sm">{'\uD83C\uDFA4'}</div>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{item.titulo}</p>
+                      <p className="text-xs text-[#b3b3b3] truncate sm:hidden">{item.artista}</p>
+                    </div>
+                    <span className="w-28 text-xs text-[#b3b3b3] truncate hidden sm:block">{item.artista}</span>
+                    <span className="w-12 text-right hidden sm:block"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.evaluacion.puntuacionTotal >= 85 ? 'bg-amber-500/20 text-amber-400' : item.evaluacion.puntuacionTotal >= 70 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>{item.evaluacion.puntuacionTotal}</span></span>
+                    <span className="w-14 text-right text-xs text-[#6a6a6a]">{item.duracion}</span>
+                  </div>
                 ))}
               </div>
               <div className="h-24"></div>
