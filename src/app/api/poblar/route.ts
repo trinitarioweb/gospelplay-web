@@ -12,9 +12,25 @@ interface YouTubeSearchResult {
   videoId: string;
   title: string;
   author: string;
+  channelVerified: boolean;
+  channelId: string;
+}
+
+// Titles that indicate compilations/fan uploads (not official singles)
+const TITULO_BLACKLIST = [
+  /\bmix\b/i, /\bmejores\s*(éxitos|exitos)\b/i, /\brecopilaci[oó]n\b/i,
+  /\bplaylist\b/i, /\b\d+\s*hora/i, /\bfull\s*album\b/i,
+  /\bcompleto\b/i, /\bgreatest\s*hits\b/i, /\bbest\s*of\b/i,
+  /\btop\s*\d+/i, /\ball\s*time\b/i, /\bcollection\b/i,
+  /\bcompilado\b/i, /\bnon[\s-]?stop\b/i,
+];
+
+function esTituloCompilacion(titulo: string): boolean {
+  return TITULO_BLACKLIST.some(re => re.test(titulo));
 }
 
 // Search YouTube by scraping search results page (no API key needed)
+// Extracts channel verification badges to identify official channels
 async function buscarYouTube(query: string, maxResults = 5): Promise<YouTubeSearchResult[]> {
   try {
     // sp=EgIQAQ%3D%3D filters for videos only
@@ -33,7 +49,7 @@ async function buscarYouTube(query: string, maxResults = 5): Promise<YouTubeSear
     // Extract ytInitialData JSON from the page
     const dataMatch = html.match(/var ytInitialData = (\{[\s\S]*?\});<\/script>/);
     if (!dataMatch) {
-      // Fallback: extract videoIds directly from HTML
+      // Fallback: extract videoIds with oEmbed (no verification info available)
       const idMatches: string[] = [];
       const re = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
       let m;
@@ -42,24 +58,42 @@ async function buscarYouTube(query: string, maxResults = 5): Promise<YouTubeSear
       const results: YouTubeSearchResult[] = [];
       for (const videoId of videoIds.slice(0, maxResults)) {
         const meta = await obtenerMetaOEmbed(videoId);
-        if (meta) results.push({ videoId, title: meta.title, author: meta.author });
+        if (meta) results.push({ videoId, title: meta.title, author: meta.author, channelVerified: false, channelId: '' });
       }
       return results;
     }
 
-    // Parse ytInitialData to get video info
+    // Parse ytInitialData to get video info INCLUDING verification badges
     const ytData = JSON.parse(dataMatch[1]);
-    const contents = ytData?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
+    const sections = ytData?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
 
     const results: YouTubeSearchResult[] = [];
-    for (const item of contents) {
-      const video = item.videoRenderer;
-      if (!video?.videoId) continue;
-      results.push({
-        videoId: video.videoId,
-        title: video.title?.runs?.[0]?.text || '',
-        author: video.ownerText?.runs?.[0]?.text || '',
-      });
+    for (const section of sections) {
+      const items = section?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const video = item.videoRenderer;
+        if (!video?.videoId) continue;
+
+        // Check for channel verification badge
+        const badges = video.ownerBadges || [];
+        const isVerified = badges.some((badge: { metadataBadgeRenderer?: { style?: string } }) => {
+          const style = badge?.metadataBadgeRenderer?.style || '';
+          return style === 'BADGE_STYLE_TYPE_VERIFIED_ARTIST'
+            || style === 'BADGE_STYLE_TYPE_VERIFIED';
+        });
+
+        // Get channel ID from navigation endpoint
+        const channelId = video.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.browseId || '';
+
+        results.push({
+          videoId: video.videoId,
+          title: video.title?.runs?.[0]?.text || '',
+          author: video.ownerText?.runs?.[0]?.text || '',
+          channelVerified: isVerified,
+          channelId,
+        });
+        if (results.length >= maxResults) break;
+      }
       if (results.length >= maxResults) break;
     }
 
@@ -68,6 +102,43 @@ async function buscarYouTube(query: string, maxResults = 5): Promise<YouTubeSear
     console.error('[Poblar] Error buscando YouTube:', e);
     return [];
   }
+}
+
+// Filter search results: only verified channels + no compilations
+function filtrarOficiales(
+  videos: YouTubeSearchResult[],
+  nombreArtista: string,
+  youtubeCanalEsperado: string
+): YouTubeSearchResult[] {
+  const nombreLower = nombreArtista.toLowerCase();
+
+  return videos.filter(video => {
+    // 1. Skip compilations/mixes/playlists
+    if (esTituloCompilacion(video.title)) {
+      console.log(`[Filtro] ✗ Compilación: "${video.title}"`);
+      return false;
+    }
+
+    // 2. Accept if channel is YouTube-verified
+    if (video.channelVerified) return true;
+
+    // 3. Accept if channel name matches our known youtube_canal
+    if (youtubeCanalEsperado) {
+      const canalLower = video.author.toLowerCase().replace(/\s+/g, '');
+      const esperadoLower = youtubeCanalEsperado.toLowerCase().replace(/\s+/g, '');
+      if (canalLower.includes(esperadoLower) || esperadoLower.includes(canalLower)) return true;
+    }
+
+    // 4. Accept if channel name contains the artist name
+    const authorLower = video.author.toLowerCase();
+    if (authorLower.includes(nombreLower) || nombreLower.includes(authorLower.replace(/vevo|official|music|tv/gi, '').trim())) return true;
+
+    // 5. Accept VEVO channels (always official)
+    if (video.author.toLowerCase().endsWith('vevo')) return true;
+
+    console.log(`[Filtro] ✗ Canal no oficial: "${video.author}" para "${nombreArtista}"`);
+    return false;
+  });
 }
 
 // Get video metadata via YouTube oEmbed
@@ -210,23 +281,30 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Poblar] Buscando canciones de ${artista.nombre}...`);
 
-    // Search YouTube for this artist
+    // Search YouTube - use "official video" to prioritize official uploads
     const searchQuery = artista.tipo === 'pastor' || artista.tipo === 'predicador'
-      ? `${artista.nombre} predicación sermón`
-      : `${artista.nombre} música cristiana oficial`;
+      ? `${artista.nombre} predicación completa`
+      : `${artista.nombre} official video`;
 
-    const videos = await buscarYouTube(searchQuery, max_canciones);
+    // Fetch more than needed so we can filter
+    const rawVideos = await buscarYouTube(searchQuery, max_canciones * 3);
+
+    // Filter: only official channels + no compilations
+    const videos = filtrarOficiales(rawVideos, artista.nombre, artista.youtube_canal || '');
 
     if (!videos.length) {
-      return NextResponse.json({ error: 'No se encontraron videos', artista: artista.nombre }, { status: 404 });
+      return NextResponse.json({ error: 'No se encontraron videos oficiales', artista: artista.nombre }, { status: 404 });
     }
 
-    console.log(`[Poblar] Encontrados ${videos.length} videos para ${artista.nombre}`);
+    console.log(`[Poblar] ${rawVideos.length} encontrados, ${videos.length} oficiales para ${artista.nombre}`);
 
     const added: { titulo: string; url: string }[] = [];
     const skipped: string[] = [];
+    const rejected: string[] = [];
 
     for (const video of videos) {
+      if (added.length >= max_canciones) break;
+
       const url = `https://www.youtube.com/watch?v=${video.videoId}`;
 
       // Check if already exists
@@ -285,12 +363,19 @@ export async function POST(request: NextRequest) {
       await new Promise(r => setTimeout(r, 500));
     }
 
+    // Videos rejected by the filter
+    const rechazados = rawVideos
+      .filter(v => !videos.includes(v))
+      .map(v => `${v.title} [${v.author}${v.channelVerified ? ' ✓' : ''}]`);
+
     return NextResponse.json({
       artista: artista.nombre,
       agregados: added.length,
       omitidos: skipped.length,
+      rechazados_no_oficial: rechazados.length,
       canciones: added,
       omitidos_lista: skipped,
+      rechazados_lista: rechazados,
     });
   } catch (error) {
     console.error('[Poblar] Error:', error);
