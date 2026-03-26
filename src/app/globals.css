@@ -80,3 +80,12 @@ body {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Subtle pulse for current lyric line */
+.animate-pulse-subtle {
+  animation: pulseLyric 3s ease-in-out infinite;
+}
+@keyframes pulseLyric {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}

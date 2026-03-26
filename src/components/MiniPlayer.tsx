@@ -88,6 +88,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
   const [playerReady, setPlayerReady] = useState(false);
   const [actuallyPlaying, setActuallyPlaying] = useState(false);
   const [showFullPlayer, setShowFullPlayer] = useState(false);
+  const [showVideoInFull, setShowVideoInFull] = useState(true);
 
   const playerRef = useRef<YTPlayer | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -327,29 +328,35 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
         onSeek={handleSeekFromFull}
         isLiked={isLiked || false}
         onLike={onLike || (() => {})}
+        showVideo={showVideoInFull}
+        onToggleVideo={() => setShowVideoInFull(v => !v)}
       />
 
       {/* ===== VIDEO CONTAINER ===== */}
       {isYoutube && (
         <div
-          className={`fixed z-40 transition-all duration-300 ease-in-out ${
-            showFullPlayer
+          className={`fixed transition-all duration-300 ease-in-out ${
+            showFullPlayer && showVideoInFull
+              ? 'z-[70] top-[56px] left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-md rounded-xl overflow-hidden'
+              : showFullPlayer && !showVideoInFull
               ? 'pointer-events-none'
               : viewMode === 'full'
-              ? 'bottom-[88px] left-0 right-0 bg-black'
+              ? 'z-40 bottom-[88px] left-0 right-0 bg-black'
               : viewMode === 'mini'
-              ? 'bottom-[96px] right-4 w-72 md:w-80 rounded-lg overflow-hidden shadow-2xl shadow-black/80 border border-[#282828]'
+              ? 'z-40 bottom-[96px] right-4 w-72 md:w-80 rounded-lg overflow-hidden shadow-2xl shadow-black/80 border border-[#282828]'
               : 'pointer-events-none'
           }`}
           style={
-            showFullPlayer || viewMode === 'audio'
+            (showFullPlayer && !showVideoInFull) || (!showFullPlayer && viewMode === 'audio')
               ? { position: 'fixed', left: '-9999px', top: '0px', width: '320px', height: '180px' }
               : undefined
           }
         >
           <div
             className={
-              viewMode === 'full' && !showFullPlayer
+              showFullPlayer && showVideoInFull
+                ? 'relative w-full aspect-video'
+                : viewMode === 'full' && !showFullPlayer
                 ? 'relative w-full'
                 : viewMode === 'mini' && !showFullPlayer
                 ? 'relative w-full aspect-video'
@@ -358,7 +365,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
             style={
               viewMode === 'full' && !showFullPlayer
                 ? { paddingBottom: '36%', maxHeight: '320px' }
-                : showFullPlayer || viewMode === 'audio'
+                : (showFullPlayer && !showVideoInFull) || (!showFullPlayer && viewMode === 'audio')
                 ? { width: '320px', height: '180px' }
                 : undefined
             }
@@ -371,7 +378,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
           </div>
 
           {/* Mini mode close button */}
-          {viewMode === 'mini' && (
+          {viewMode === 'mini' && !showFullPlayer && (
             <button
               onClick={() => setViewMode('audio')}
               className="absolute top-2 right-2 p-1 bg-black/60 rounded-full hover:bg-black/80 transition"
