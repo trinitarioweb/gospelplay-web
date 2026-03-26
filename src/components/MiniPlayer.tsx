@@ -214,7 +214,13 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
         isLiked={isLiked || false}
         onLike={onLike || (() => {})}
         showVideo={showVideoInFull}
-        onToggleVideo={() => setShowVideoInFull(v => !v)}
+        onToggleVideo={() => {
+          setShowVideoInFull(v => {
+            // Sync mini player video state
+            setShowVideo(!v);
+            return !v;
+          });
+        }}
       />
 
       {/* ===== VIDEO CONTAINER (YouTube iframe) ===== */}
@@ -244,12 +250,17 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
             }
           >
             <div id={containerRef.current} className="absolute top-0 left-0 w-full h-full" style={{ minWidth: '320px', minHeight: '180px' }} />
-            {/* Overlays to hide YouTube branding */}
+            {/* Click blocker and overlays */}
             {videoVisible && (
               <>
-                <div className="absolute top-0 left-0 right-0 h-14 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-[5] pointer-events-none" />
-                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-[5] pointer-events-none" />
-                {/* Click blocker - tap non-fullplayer video to expand */}
+                {/* Only show gradient overlays in full player to hide YouTube UI */}
+                {showFullPlayer && (
+                  <>
+                    <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-black/60 to-transparent z-[5] pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/50 to-transparent z-[5] pointer-events-none" />
+                  </>
+                )}
+                {/* Tap mini video to expand */}
                 {!showFullPlayer && (
                   <button
                     onClick={() => { setShowVideoInFull(true); setShowFullPlayer(true); }}
@@ -297,7 +308,11 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
               {/* Video toggle */}
               {isYoutube && (
                 <button
-                  onClick={() => setShowVideo(v => !v)}
+                  onClick={() => {
+                    const next = !showVideo;
+                    setShowVideo(next);
+                    setShowVideoInFull(next);
+                  }}
                   className={`p-2.5 rounded-full transition ${showVideo ? 'text-amber-400' : 'text-[#6a6a6a]'}`}
                 >
                   {showVideo ? <Video size={18} /> : <VideoOff size={18} />}

@@ -12,23 +12,35 @@ function limpiarMetadata(titulo: string, artista: string): { track: string; arti
   let track = titulo;
   let artist = artista;
 
-  // Remove VEVO suffix from artist
-  artist = artist.replace(/VEVO$/i, '').replace(/\s*-\s*Topic$/i, '').trim();
+  // Remove VEVO, Topic, Rock, Official suffixes from artist
+  artist = artist
+    .replace(/VEVO$/i, '')
+    .replace(/\s*-\s*Topic$/i, '')
+    .replace(/\s+(Rock|Official|Music|Band)$/i, '')
+    .trim();
 
-  // If title has "Artist - Track" format, extract both
+  // Handle "TRACK // ARTIST (stuff)" format (common in Spanish YouTube)
+  const doubleSlashMatch = track.match(/^(.+?)\s*\/\/\s*(.+)$/);
+  if (doubleSlashMatch) {
+    track = doubleSlashMatch[1].trim();
+    // Use the part after // as artist hint if it matches
+    const afterSlash = doubleSlashMatch[2].trim();
+    const cleanAfterSlash = afterSlash.replace(/\(.*\)/g, '').trim();
+    if (cleanAfterSlash) artist = cleanAfterSlash;
+  }
+
+  // Handle "Artist - Track" format
   const dashMatch = track.match(/^(.+?)\s*[-–—]\s*(.+)$/);
   if (dashMatch) {
     const possibleArtist = dashMatch[1].trim();
     const possibleTrack = dashMatch[2].trim();
-    // Use the part after the dash as the track name
     track = possibleTrack;
-    // If artist was just a channel name, use the one from the title
     if (!artist || artist.toLowerCase().includes('vevo') || artist.toLowerCase().includes('official')) {
       artist = possibleArtist;
     }
   }
 
-  // Remove common YouTube suffixes from track name
+  // Remove common YouTube suffixes
   track = track
     .replace(/\(Official\s*(Music\s*)?Video\)/gi, '')
     .replace(/\(Official\s*Audio\)/gi, '')
@@ -37,14 +49,18 @@ function limpiarMetadata(titulo: string, artista: string): { track: string; arti
     .replace(/\(Live\)/gi, '')
     .replace(/\(Audio\s*Oficial\)/gi, '')
     .replace(/\(Video\s*Oficial\)/gi, '')
+    .replace(/\(video\s*lyrics?\s*oficial\)/gi, '')
     .replace(/\(En\s*Vivo\)/gi, '')
     .replace(/\[Official\s*(Music\s*)?Video\]/gi, '')
     .replace(/\[Audio\]/gi, '')
     .replace(/\[Lyrics?\]/gi, '')
-    .replace(/\|.*$/g, '') // Remove everything after |
-    .replace(/ft\.?\s*.+$/i, '') // Remove feat/ft
+    .replace(/\|.*$/g, '')
+    .replace(/\/\/.*$/g, '') // Remove everything after //
+    .replace(/ft\.?\s*.+$/i, '')
     .replace(/feat\.?\s*.+$/i, '')
     .replace(/\(feat\.?\s*[^)]+\)/gi, '')
+    .replace(/\(.*?\)/g, '') // Remove any remaining parentheses
+    .replace(/\[.*?\]/g, '') // Remove any remaining brackets
     .replace(/\s{2,}/g, ' ')
     .trim();
 
@@ -52,6 +68,9 @@ function limpiarMetadata(titulo: string, artista: string): { track: string; arti
   artist = artist
     .replace(/Official$/i, '')
     .replace(/Music$/i, '')
+    .replace(/Rock$/i, '')
+    .replace(/Band$/i, '')
+    .replace(/\(.*?\)/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
