@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { limpiarMetadata } from '@/lib/limpiar-metadata';
+import { buscarArtworkCancion } from '@/lib/artwork';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -243,8 +244,9 @@ export async function POST(request: NextRequest) {
       // Clean metadata
       const { track, artist } = limpiarMetadata(video.title, video.author);
 
-      // Get thumbnail
-      const thumbnail = `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`;
+      // Get official artwork from iTunes, fallback to YouTube thumbnail
+      const artwork = await buscarArtworkCancion(track, artist || artista.nombre);
+      const thumbnail = artwork || `https://img.youtube.com/vi/${video.videoId}/hqdefault.jpg`;
 
       // Classify with AI
       const clasificacion = await clasificarConIA(track, artist);
