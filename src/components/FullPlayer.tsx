@@ -348,18 +348,21 @@ export default function FullPlayer({
 
   // ===== MAIN PLAYER VIEW =====
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden">
-      {/* Background - thumbnail blur or gradient */}
-      {track.thumbnail && (
-        <div className="absolute inset-0 z-0">
-          <img src={track.thumbnail} alt="" className="w-full h-full object-cover scale-110 blur-3xl opacity-30" />
-          <div className="absolute inset-0 bg-black/60" />
-        </div>
-      )}
-      {!track.thumbnail && <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#1a1a2e] to-[#121212]" />}
+    <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#121212]">
+      {/* Background - thumbnail blur */}
+      <div className="absolute inset-0 z-0">
+        {track.thumbnail ? (
+          <>
+            <img src={track.thumbnail} alt="" className="w-full h-full object-cover scale-125 blur-3xl opacity-50" />
+            <div className="absolute inset-0 bg-black/40" />
+          </>
+        ) : (
+          <div className="w-full h-full bg-gradient-to-b from-[#1a1a2e] to-[#121212]" />
+        )}
+      </div>
 
       {/* ===== HEADER ===== */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0 relative z-10">
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0 relative z-[77]">
         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition">
           <ChevronDown size={24} className="text-white" />
         </button>
@@ -378,9 +381,12 @@ export default function FullPlayer({
         </button>
       </div>
 
+      {/* Cover video iframe when queue is showing */}
+      {showQueue && <div className="fixed inset-0 bg-[#121212] z-[75]" />}
+
       {/* ===== MAIN CONTENT ===== */}
       {showQueue ? (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-10">
+        <div className="flex-1 overflow-y-auto px-4 pb-4 relative z-[76]">
           <h3 className="text-lg font-bold text-white mb-3">Cola de reproduccion</h3>
           {hasPlaylist ? (
             <div className="space-y-1">
@@ -408,15 +414,7 @@ export default function FullPlayer({
         <div className="flex-1 flex flex-col items-center px-6 pb-2 overflow-y-auto relative z-10">
           {/* Video area - spacer for iframe overlay from MiniPlayer */}
           {isYoutube && showVideo && (
-            <div className="w-full max-w-md aspect-video rounded-xl bg-black mb-2 flex-shrink-0 mt-2 relative">
-              <button
-                onClick={onToggleVideo}
-                className="absolute top-3 right-3 p-2.5 bg-black/70 rounded-full hover:bg-black/90 transition z-[80]"
-                title="Desactivar video"
-              >
-                <VideoOff size={18} className="text-white" />
-              </button>
-            </div>
+            <div className="w-full max-w-md aspect-video rounded-xl bg-black mb-2 flex-shrink-0 mt-2" />
           )}
 
           {/* Thumbnail when video is off */}
@@ -425,12 +423,26 @@ export default function FullPlayer({
               <div className="w-full aspect-square max-h-[360px] bg-gradient-to-br from-[#282828] to-[#181818] flex items-center justify-center">
                 {track.thumbnail ? <img src={track.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="text-6xl text-[#3a3a3a]">&#9835;</div>}
               </div>
-              {isYoutube && (
-                <button onClick={onToggleVideo} className="absolute top-3 right-3 p-2.5 bg-black/70 rounded-full hover:bg-black/90 transition z-10 flex items-center gap-1.5" title="Activar video">
-                  <Video size={18} className="text-white" />
-                  <span className="text-white text-xs font-medium pr-1">Video</span>
-                </button>
-              )}
+            </div>
+          )}
+
+          {/* Video toggle button - floats above everything */}
+          {isYoutube && (
+            <div className="w-full max-w-md flex justify-end -mt-12 mb-2 pr-2 relative z-[90]">
+              <button
+                onClick={onToggleVideo}
+                className="p-2.5 bg-black/80 rounded-full hover:bg-black/95 transition flex items-center gap-1.5 shadow-lg"
+                title={showVideo ? 'Desactivar video' : 'Activar video'}
+              >
+                {showVideo ? (
+                  <VideoOff size={18} className="text-white" />
+                ) : (
+                  <>
+                    <Video size={18} className="text-white" />
+                    <span className="text-white text-xs font-medium pr-0.5">Video</span>
+                  </>
+                )}
+              </button>
             </div>
           )}
 
