@@ -1,91 +1,113 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SYSTEM_PROMPT = `Eres un experto en letras de canciones cristianas y gospel en español e inglés.
+// Use lrclib.net - free API with synced lyrics (timestamps)
+// Falls back to lyrics.ovh if not found
 
-El usuario te pedirá la letra de una canción. Si conoces la letra REAL de esa canción, devuélvela completa y exacta.
-
-REGLAS:
-- Devuelve la letra REAL de la canción tal como es, con sus versos, coros y puentes.
-- Usa saltos de línea simples entre versos y líneas vacías entre secciones (verso, coro, puente, etc.).
-- NO inventes letras. Si no conoces la letra exacta de la canción, responde EXACTAMENTE con la palabra: NO_ENCONTRADA
-- NO agregues encabezados como [Verso 1], [Coro], etc. Solo la letra pura.
-- Si la canción es en inglés, devuelve la letra en inglés.
-- Si la canción es en español, devuelve la letra en español.
-- NO incluyas notas, explicaciones ni aclaraciones. SOLO la letra o NO_ENCONTRADA.`;
+interface LrcLibResult {
+  syncedLyrics: string | null;
+  plainLyrics: string | null;
+  trackName: string;
+  artistName: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { titulo, artista } = body;
-
-    console.log('[API Letras] Request received:', { titulo, artista });
+    const { titulo, artista } = await request.json();
 
     if (!titulo) {
       return NextResponse.json({ error: 'Se requiere un titulo' }, { status: 400 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    console.log('[API Letras] API key present:', !!apiKey);
+    console.log('[Letras] Buscando:', titulo, '-', artista);
 
-    if (!apiKey || apiKey === 'tu-api-key-aqui') {
+    // 1. Try lrclib.net direct lookup
+    const lrcResult = await buscarEnLrcLib(titulo, artista);
+    if (lrcResult) {
+      console.log('[Letras] Encontrada en lrclib.net, synced:', !!lrcResult.syncedLyrics);
       return NextResponse.json({
-        letras: 'API key no configurada. No se puede buscar la letra.',
-        encontrada: false,
+        letras: lrcResult.syncedLyrics || lrcResult.plainLyrics,
+        sincronizada: !!lrcResult.syncedLyrics,
+        encontrada: true,
       });
     }
 
-    const userMessage = `Dame la letra completa de la cancion "${titulo}" de ${artista || 'artista desconocido'}.`;
-    console.log('[API Letras] Calling Claude API...');
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 3000,
-        system: SYSTEM_PROMPT,
-        messages: [
-          { role: 'user', content: userMessage },
-        ],
-      }),
-    });
-
-    console.log('[API Letras] Claude response status:', response.status);
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error('[API Letras] Claude API error:', response.status, errBody);
+    // 2. Try lrclib.net search
+    const lrcSearchResult = await buscarEnLrcLibSearch(titulo, artista);
+    if (lrcSearchResult) {
+      console.log('[Letras] Encontrada via lrclib search, synced:', !!lrcSearchResult.syncedLyrics);
       return NextResponse.json({
-        letras: `No se pudo buscar la letra (error ${response.status}).`,
-        encontrada: false,
+        letras: lrcSearchResult.syncedLyrics || lrcSearchResult.plainLyrics,
+        sincronizada: !!lrcSearchResult.syncedLyrics,
+        encontrada: true,
       });
     }
 
-    const data = await response.json();
-    const text: string = (data.content?.[0]?.text || '').trim();
-
-    console.log('[API Letras] Response length:', text.length, 'First 100 chars:', text.substring(0, 100));
-
-    if (!text || text === 'NO_ENCONTRADA' || text.includes('NO_ENCONTRADA')) {
+    // 3. Fallback: lyrics.ovh
+    const ovhResult = await buscarEnLyricsOvh(titulo, artista);
+    if (ovhResult) {
+      console.log('[Letras] Encontrada en lyrics.ovh');
       return NextResponse.json({
-        letras: `No se encontro la letra de "${titulo}".`,
-        encontrada: false,
+        letras: ovhResult,
+        sincronizada: false,
+        encontrada: true,
       });
     }
 
+    console.log('[Letras] No encontrada en ninguna fuente');
     return NextResponse.json({
-      letras: text,
-      encontrada: true,
+      letras: null,
+      sincronizada: false,
+      encontrada: false,
     });
   } catch (error) {
-    console.error('[API Letras] Server error:', error);
+    console.error('[Letras] Error:', error);
     return NextResponse.json(
-      { letras: 'Error interno del servidor.', encontrada: false },
+      { letras: null, sincronizada: false, encontrada: false },
       { status: 200 }
     );
+  }
+}
+
+async function buscarEnLrcLib(titulo: string, artista: string): Promise<LrcLibResult | null> {
+  try {
+    const url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artista || '')}&track_name=${encodeURIComponent(titulo)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'GospelPlay/1.0' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.plainLyrics || data.syncedLyrics) {
+      return data as LrcLibResult;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function buscarEnLrcLibSearch(titulo: string, artista: string): Promise<LrcLibResult | null> {
+  try {
+    const query = `${artista ? artista + ' ' : ''}${titulo}`;
+    const url = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'GospelPlay/1.0' } });
+    if (!res.ok) return null;
+    const data: LrcLibResult[] = await res.json();
+    if (data.length > 0 && (data[0].plainLyrics || data[0].syncedLyrics)) {
+      return data[0];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function buscarEnLyricsOvh(titulo: string, artista: string): Promise<string | null> {
+  try {
+    if (!artista) return null;
+    const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(artista)}/${encodeURIComponent(titulo)}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.lyrics || null;
+  } catch {
+    return null;
   }
 }

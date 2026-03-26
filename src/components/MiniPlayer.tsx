@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ExternalLink, SkipBack, SkipForward, ListMusic, Play, Pause, Video, VideoOff, ChevronUp } from 'lucide-react';
+import { X, SkipForward, Play, Pause, Video, VideoOff, Heart } from 'lucide-react';
 import type { Contenido } from '@/types/content';
 import FullPlayer from './FullPlayer';
 
@@ -36,13 +36,6 @@ function extraerYouTubeId(url: string): string | null {
     if (match) return match[1];
   }
   return null;
-}
-
-function formatTime(seconds: number): string {
-  if (!seconds || isNaN(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 // Extend Window for YouTube API
@@ -97,14 +90,12 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
   const isYoutube = track?.plataforma === 'youtube' && youtubeId;
 
   const hasPlaylist = playlistContext && playlistContext.items.length > 1;
-  const canPrevious = hasPlaylist && playlistContext.currentIndex > 0;
   const canNext = hasPlaylist && playlistContext.currentIndex < playlistContext.items.length - 1;
 
   // Load YouTube IFrame API
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (document.getElementById('yt-api-script')) return;
-
     const script = document.createElement('script');
     script.id = 'yt-api-script';
     script.src = 'https://www.youtube.com/iframe_api';
@@ -115,7 +106,6 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
   useEffect(() => {
     if (!track || !youtubeId || !isYoutube) return;
     if (track.id === prevTrackId.current && playerRef.current) return;
-
     prevTrackId.current = track.id;
 
     const createPlayer = () => {
@@ -123,31 +113,17 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
         try { playerRef.current.destroy(); } catch {}
         playerRef.current = null;
       }
-
       setPlayerReady(false);
       setCurrentTime(0);
       setDuration(0);
 
       const container = document.getElementById(containerRef.current);
-      if (!container) {
-        setTimeout(createPlayer, 200);
-        return;
-      }
+      if (!container) { setTimeout(createPlayer, 200); return; }
 
       try {
         playerRef.current = new window.YT.Player(containerRef.current, {
           videoId: youtubeId,
-          playerVars: {
-            autoplay: 1,
-            controls: 0,
-            modestbranding: 1,
-            rel: 0,
-            showinfo: 0,
-            iv_load_policy: 3,
-            disablekb: 1,
-            fs: 0,
-            playsinline: 1,
-          },
+          playerVars: { autoplay: 1, controls: 0, modestbranding: 1, rel: 0, showinfo: 0, iv_load_policy: 3, disablekb: 1, fs: 0, playsinline: 1 },
           events: {
             onReady: (event: { target: YTPlayer }) => {
               setPlayerReady(true);
@@ -156,137 +132,56 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
               setActuallyPlaying(true);
             },
             onStateChange: (event: { data: number; target: YTPlayer }) => {
-              if (event.data === window.YT.PlayerState.PLAYING) {
-                setActuallyPlaying(true);
-                setDuration(event.target.getDuration());
-              } else if (event.data === window.YT.PlayerState.PAUSED) {
-                setActuallyPlaying(false);
-              } else if (event.data === window.YT.PlayerState.ENDED) {
-                setActuallyPlaying(false);
-                if (canNext && onNext) onNext();
-              }
+              if (event.data === window.YT.PlayerState.PLAYING) { setActuallyPlaying(true); setDuration(event.target.getDuration()); }
+              else if (event.data === window.YT.PlayerState.PAUSED) { setActuallyPlaying(false); }
+              else if (event.data === window.YT.PlayerState.ENDED) { setActuallyPlaying(false); if (canNext && onNext) onNext(); }
             },
           },
         });
-      } catch {
-        setTimeout(createPlayer, 500);
-      }
+      } catch { setTimeout(createPlayer, 500); }
     };
 
-    if (window.YT && window.YT.Player) {
-      setTimeout(createPlayer, 100);
-    } else {
-      window.onYouTubeIframeAPIReady = () => {
-        setTimeout(createPlayer, 100);
-      };
-    }
+    if (window.YT && window.YT.Player) setTimeout(createPlayer, 100);
+    else window.onYouTubeIframeAPIReady = () => setTimeout(createPlayer, 100);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, youtubeId]);
 
-  // Update time periodically
+  // Update time
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-
     if (actuallyPlaying && playerRef.current) {
       intervalRef.current = setInterval(() => {
-        if (playerRef.current) {
-          try {
-            setCurrentTime(playerRef.current.getCurrentTime());
-          } catch {}
-        }
+        if (playerRef.current) try { setCurrentTime(playerRef.current.getCurrentTime()); } catch {}
       }, 500);
     }
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [actuallyPlaying]);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
-      if (playerRef.current) {
-        try { playerRef.current.destroy(); } catch {}
-      }
+      if (playerRef.current) try { playerRef.current.destroy(); } catch {}
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
   const handlePlayPause = useCallback(() => {
     if (!playerRef.current || !playerReady) return;
-    try {
-      if (actuallyPlaying) {
-        playerRef.current.pauseVideo();
-      } else {
-        playerRef.current.playVideo();
-      }
-    } catch {}
+    try { if (actuallyPlaying) playerRef.current.pauseVideo(); else playerRef.current.playVideo(); } catch {}
     onTogglePlay();
   }, [actuallyPlaying, playerReady, onTogglePlay]);
 
-  const [isDragging, setIsDragging] = useState(false);
-  const progressBarRef = useRef<HTMLDivElement>(null);
-
-  const seekToPosition = useCallback((clientX: number) => {
-    if (!playerRef.current || !playerReady || !duration || !progressBarRef.current) return;
-    const rect = progressBarRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    const percent = x / rect.width;
-    const seekTime = percent * duration;
-    playerRef.current.seekTo(seekTime, true);
-    setCurrentTime(seekTime);
-  }, [playerReady, duration]);
-
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    seekToPosition(e.clientX);
-  }, [seekToPosition]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    setIsDragging(true);
-    seekToPosition(e.clientX);
-  }, [seekToPosition]);
-
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => seekToPosition(e.clientX);
-    const handleMouseUp = () => setIsDragging(false);
-    const handleTouchMove = (e: TouchEvent) => { e.preventDefault(); if (e.touches[0]) seekToPosition(e.touches[0].clientX); };
-    const handleTouchEnd = () => setIsDragging(false);
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', handleTouchEnd);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [isDragging, seekToPosition]);
-
   const handleSeekFromFull = useCallback((time: number) => {
-    if (playerRef.current && playerReady) {
-      playerRef.current.seekTo(time, true);
-      setCurrentTime(time);
-    }
+    if (playerRef.current && playerReady) { playerRef.current.seekTo(time, true); setCurrentTime(time); }
   }, [playerReady]);
-
-  const handlePlayPauseFromFull = useCallback(() => {
-    handlePlayPause();
-  }, [handlePlayPause]);
 
   if (!track) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Determine if video iframe should be visible or off-screen
+  // Video visible logic
   const videoVisible =
     (showFullPlayer && showVideoInFull) ||
     (!showFullPlayer && showVideo);
@@ -299,7 +194,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
         isPlaying={actuallyPlaying}
         isOpen={showFullPlayer}
         onClose={() => setShowFullPlayer(false)}
-        onTogglePlay={handlePlayPauseFromFull}
+        onTogglePlay={handlePlayPause}
         onNext={onNext}
         onPrevious={onPrevious}
         playlistContext={playlistContext}
@@ -320,7 +215,7 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
             showFullPlayer && showVideoInFull
               ? 'z-[70] top-[56px] left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-md rounded-xl overflow-hidden'
               : !showFullPlayer && showVideo
-              ? 'z-40 bottom-[88px] left-0 right-0 bg-black'
+              ? 'z-40 bottom-[72px] left-0 right-0 bg-black'
               : 'pointer-events-none'
           }`}
           style={
@@ -335,170 +230,93 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
               videoVisible
                 ? showFullPlayer
                   ? { paddingBottom: '56.25%' }
-                  : { paddingBottom: '36%', maxHeight: '320px' }
+                  : { paddingBottom: '36%', maxHeight: '280px' }
                 : { width: '320px', height: '180px' }
             }
           >
-            {/* YouTube iframe */}
-            <div
-              id={containerRef.current}
-              className="absolute top-0 left-0 w-full h-full"
-              style={{ minWidth: '320px', minHeight: '180px' }}
-            />
-
-            {/* Overlay to hide YouTube branding/title */}
+            <div id={containerRef.current} className="absolute top-0 left-0 w-full h-full" style={{ minWidth: '320px', minHeight: '180px' }} />
+            {/* Overlays to hide YouTube branding */}
             {videoVisible && (
               <>
-                <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-black/80 to-transparent z-[5] pointer-events-none" />
-                <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/80 to-transparent z-[5] pointer-events-none" />
-                {/* Transparent click blocker to prevent YouTube UI interactions */}
-                <div className="absolute inset-0 z-[4]" />
+                <div className="absolute top-0 left-0 right-0 h-14 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-[5] pointer-events-none" />
+                <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-[5] pointer-events-none" />
+                {/* Click blocker - tap non-fullplayer video to expand */}
+                {!showFullPlayer && (
+                  <button
+                    onClick={() => { setShowVideoInFull(true); setShowFullPlayer(true); }}
+                    className="absolute inset-0 z-[6]"
+                  />
+                )}
+                {showFullPlayer && <div className="absolute inset-0 z-[4]" />}
               </>
             )}
           </div>
         </div>
       )}
 
-      {/* ===== BOTTOM PLAYER BAR ===== */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#181818] border-t border-[#282828]">
-        {/* Progress bar */}
-        <div
-          ref={progressBarRef}
-          className="w-full cursor-pointer group relative select-none"
-          style={{ touchAction: 'none' }}
-          onClick={handleSeek}
-          onMouseDown={handleMouseDown}
-          onTouchStart={(e) => { e.preventDefault(); setIsDragging(true); if (e.touches[0]) seekToPosition(e.touches[0].clientX); }}
-        >
-          <div className="h-6 relative flex items-end">
-            <div className={`w-full relative ${isDragging ? 'h-2' : 'h-1 group-hover:h-2'} transition-all`}>
-              <div className="absolute inset-0 bg-[#3a3a3a] rounded-full" />
-              <div
-                className={`absolute top-0 left-0 h-full rounded-full ${isDragging ? 'bg-amber-400' : 'bg-amber-500 group-hover:bg-amber-400'} transition-colors`}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div
-              className={`absolute bottom-0 -translate-x-1/2 w-4 h-4 bg-white rounded-full shadow-lg ${isDragging ? 'opacity-100 scale-125' : 'opacity-0 group-hover:opacity-100'} transition-all`}
-              style={{ left: `${progress}%`, marginBottom: '-4px' }}
-            />
-          </div>
+      {/* ===== SPOTIFY-STYLE BOTTOM BAR ===== */}
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        {/* Progress bar thin line */}
+        <div className="w-full h-[2px] bg-[#3a3a3a]">
+          <div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${progress}%` }} />
         </div>
 
-        <div className="max-w-screen-xl mx-auto px-3 py-2 flex items-center gap-2 md:gap-4">
+        {/* Player bar */}
+        <div className="bg-[#181818] border-t border-[#282828]">
+          <div className="max-w-screen-xl mx-auto px-3 py-2 flex items-center gap-3">
 
-          {/* === Left: Track info === */}
-          <button
-            onClick={() => setShowFullPlayer(true)}
-            className="flex items-center gap-3 flex-1 min-w-0 max-w-[30%] md:max-w-[25%] text-left hover:bg-white/5 rounded-md p-1 -m-1 transition"
-          >
-            <div className="w-12 h-12 rounded-md bg-[#282828] flex-shrink-0 overflow-hidden">
-              {track.thumbnail ? (
-                <img src={track.thumbnail} alt="" className="w-12 h-12 rounded-md object-cover" />
-              ) : (
-                <div className="w-12 h-12 flex items-center justify-center text-[#6a6a6a]">&#9835;</div>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-xs md:text-sm truncate text-white">{track.titulo}</p>
-              <p className="text-[10px] md:text-xs text-[#b3b3b3] truncate">{track.artista}</p>
-            </div>
-            <ChevronUp size={14} className="text-[#6a6a6a] flex-shrink-0 hidden md:block" />
-          </button>
-
-          {/* === Center: Controls === */}
-          <div className="flex flex-col items-center gap-0.5 flex-1">
-            {hasPlaylist && (
-              <div className="flex items-center gap-1.5">
-                <ListMusic size={10} className="text-amber-400" />
-                <p className="text-[10px] text-amber-400 truncate">
-                  {playlistContext.nombre} &middot; {playlistContext.currentIndex + 1} de {playlistContext.items.length}
-                </p>
+            {/* Left: Track info - tappable to expand (takes most space like Spotify) */}
+            <button
+              onClick={() => setShowFullPlayer(true)}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            >
+              <div className="w-11 h-11 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
+                {track.thumbnail ? (
+                  <img src={track.thumbnail} alt="" className="w-11 h-11 object-cover" />
+                ) : (
+                  <div className="w-11 h-11 flex items-center justify-center text-[#6a6a6a]">&#9835;</div>
+                )}
               </div>
-            )}
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-sm truncate text-white">{track.titulo}</p>
+                <p className="text-xs text-[#b3b3b3] truncate">{track.artista}</p>
+              </div>
+            </button>
 
-            <div className="flex items-center gap-3 md:gap-5">
-              <button
-                onClick={onPrevious}
-                disabled={!canPrevious}
-                className={`p-1 transition ${canPrevious ? 'text-[#b3b3b3] hover:text-white' : 'text-[#3a3a3a] cursor-not-allowed'}`}
-              >
-                <SkipBack size={20} fill={canPrevious ? 'currentColor' : '#3a3a3a'} />
-              </button>
+            {/* Right: Action buttons */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Video toggle */}
+              {isYoutube && (
+                <button
+                  onClick={() => setShowVideo(v => !v)}
+                  className={`p-2.5 rounded-full transition ${showVideo ? 'text-amber-400' : 'text-[#6a6a6a]'}`}
+                >
+                  {showVideo ? <Video size={18} /> : <VideoOff size={18} />}
+                </button>
+              )}
 
+              {/* Like */}
+              {onLike && (
+                <button
+                  onClick={() => onLike(track.id)}
+                  className={`p-2.5 transition ${isLiked ? 'text-amber-400' : 'text-[#6a6a6a]'}`}
+                >
+                  <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
+                </button>
+              )}
+
+              {/* Play/Pause */}
               <button
                 onClick={handlePlayPause}
-                className="p-2.5 bg-white rounded-full hover:scale-105 active:scale-95 transition-transform"
+                className="p-2 ml-1"
               >
                 {actuallyPlaying ? (
-                  <Pause size={18} fill="black" className="text-black" />
+                  <Pause size={24} fill="white" className="text-white" />
                 ) : (
-                  <Play size={18} fill="black" className="text-black ml-0.5" />
+                  <Play size={24} fill="white" className="text-white" />
                 )}
               </button>
-
-              <button
-                onClick={onNext}
-                disabled={!canNext}
-                className={`p-1 transition ${canNext ? 'text-[#b3b3b3] hover:text-white' : 'text-[#3a3a3a] cursor-not-allowed'}`}
-              >
-                <SkipForward size={20} fill={canNext ? 'currentColor' : '#3a3a3a'} />
-              </button>
             </div>
-
-            <div className="flex items-center gap-2 text-[10px] text-[#6a6a6a]">
-              <span>{formatTime(currentTime)}</span>
-              <span>/</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
-
-          {/* === Right: Extra controls === */}
-          <div className="flex items-center gap-1 flex-1 justify-end max-w-[30%] md:max-w-[25%]">
-            {/* Score */}
-            <div className="hidden md:flex items-center px-2 py-1 bg-amber-500/15 rounded text-xs font-bold text-amber-400">
-              {track.evaluacion.puntuacionTotal}/100
-            </div>
-
-            {/* Video on/off toggle */}
-            {isYoutube && (
-              <button
-                onClick={() => setShowVideo(v => !v)}
-                className={`p-2 rounded-full transition ${
-                  showVideo
-                    ? 'text-amber-400 hover:text-amber-300 hover:bg-white/10'
-                    : 'text-[#6a6a6a] hover:text-white hover:bg-white/10'
-                }`}
-                title={showVideo ? 'Desactivar video' : 'Activar video'}
-              >
-                {showVideo ? <Video size={16} /> : <VideoOff size={16} />}
-              </button>
-            )}
-
-            {/* External link */}
-            <a
-              href={track.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 hover:bg-white/10 rounded-full transition text-[#b3b3b3] hover:text-white"
-            >
-              <ExternalLink size={16} />
-            </a>
-
-            {/* Close */}
-            <button
-              onClick={() => {
-                if (playerRef.current) {
-                  try { playerRef.current.destroy(); } catch {}
-                  playerRef.current = null;
-                }
-                prevTrackId.current = null;
-                onClose();
-              }}
-              className="p-2 hover:bg-white/10 rounded-full transition text-[#b3b3b3] hover:text-white"
-            >
-              <X size={16} />
-            </button>
           </div>
         </div>
       </div>
