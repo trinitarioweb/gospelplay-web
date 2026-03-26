@@ -8,9 +8,10 @@ import { obtenerPlaylists, agregarAPlaylist, crearPlaylist } from '@/lib/databas
 interface ContentCardProps {
   contenido: Contenido;
   onPlay: (contenido: Contenido) => void;
-  onLike: (id: string) => void;
-  isLiked: boolean;
+  onLike?: (id: string) => void;
+  isLiked?: boolean;
   compact?: boolean;
+  index?: number;
   onPlaylistsChanged?: () => void;
 }
 
@@ -145,7 +146,7 @@ function PlaylistDropdown({ contenidoId, onClose, onPlaylistsChanged }: { conten
   );
 }
 
-export default function ContentCard({ contenido, onPlay, onLike, isLiked, compact = false, onPlaylistsChanged }: ContentCardProps) {
+export default function ContentCard({ contenido, onPlay, onLike, isLiked, compact = false, index, onPlaylistsChanged }: ContentCardProps) {
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
 
   // Compact row variant (for search results, lists, trending)
@@ -198,7 +199,7 @@ export default function ContentCard({ contenido, onPlay, onLike, isLiked, compac
 
         {/* Like */}
         <button
-          onClick={(e) => { e.stopPropagation(); onLike(contenido.id); }}
+          onClick={(e) => { e.stopPropagation(); onLike?.(contenido.id); }}
           className="p-1.5 rounded-full hover:bg-white/10 transition opacity-0 group-hover:opacity-100"
         >
           <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} className={isLiked ? 'text-amber-400' : 'text-[#b3b3b3]'} />
@@ -262,7 +263,7 @@ export default function ContentCard({ contenido, onPlay, onLike, isLiked, compac
           )}
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); onLike(contenido.id); }}
+          onClick={(e) => { e.stopPropagation(); onLike?.(contenido.id); }}
           className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 transition"
         >
           <Heart size={14} fill={isLiked ? 'currentColor' : 'none'} className={isLiked ? 'text-amber-400' : 'text-white'} />

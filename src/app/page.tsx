@@ -7,9 +7,10 @@ import MiniPlayer from '@/components/MiniPlayer';
 import ContentCard from '@/components/ContentCard';
 import GuiaEstudioCard from '@/components/GuiaEstudioCard';
 import AddContentModal from '@/components/AddContentModal';
-import { obtenerMusica, obtenerEnsenanzas, obtenerEstudios, obtenerTodoContenido, obtenerGuias, obtenerComunidades, obtenerBotLog, obtenerEstadisticas, buscarContenido as buscarEnDB, obtenerPlaylists, obtenerPlaylist, crearPlaylist, eliminarDePlaylist, eliminarPlaylist } from '@/lib/database';
+import { obtenerMusica, obtenerEnsenanzas, obtenerEstudios, obtenerTodoContenido, obtenerGuias, obtenerComunidades, obtenerBotLog, obtenerEstadisticas, buscarContenido as buscarEnDB, obtenerPlaylists, obtenerPlaylist, crearPlaylist, eliminarDePlaylist, eliminarPlaylist, obtenerArtistas } from '@/lib/database';
 import { temasPopulares, librosBiblia, necesidades } from '@/lib/datos-ejemplo';
-import type { Contenido, GuiaEstudio, Comunidad, FiltrosBusqueda, Playlist } from '@/types/content';
+import ArtistaCard from '@/components/ArtistaCard';
+import type { Contenido, GuiaEstudio, Comunidad, FiltrosBusqueda, Playlist, Artista } from '@/types/content';
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState('home');
@@ -35,6 +36,7 @@ export default function HomePage() {
   const [stats, setStats] = useState({ contenidoAnalizado: 0, contenidoAprobado: 0, contenidoRechazado: 0, guiasGeneradas: 0 });
   const [cargando, setCargando] = useState(true);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Contenido[]>([]);
+  const [artistas, setArtistas] = useState<Artista[]>([]);
 
   // Playlist state
   const [playlists, setPlaylists] = useState<(Playlist & { _itemCount?: number })[]>([]);
@@ -62,7 +64,7 @@ export default function HomePage() {
   // Cargar datos
   async function cargarDatos() {
     setCargando(true);
-    const [m, e, s, t, g, c, b, st] = await Promise.all([
+    const [m, e, s, t, g, c, b, st, ar] = await Promise.all([
       obtenerMusica(),
       obtenerEnsenanzas(),
       obtenerEstudios(),
@@ -71,6 +73,7 @@ export default function HomePage() {
       obtenerComunidades(),
       obtenerBotLog(),
       obtenerEstadisticas(),
+      obtenerArtistas(),
     ]);
     setMusica(m);
     setEnsenanzas(e);
@@ -80,6 +83,7 @@ export default function HomePage() {
     setComunidades(c);
     setBotLog(b);
     setStats(st);
+    setArtistas(ar);
     setCargando(false);
   }
 
@@ -354,6 +358,27 @@ export default function HomePage() {
                   <p className="text-center py-8 text-[#6a6a6a] text-sm">No hay musica en esta categoria</p>
                 )}
               </section>
+
+              {/* ====== SECTION: ARTISTAS ====== */}
+              {artistas.length > 0 && (
+                <section className="px-4 md:px-6 py-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+                      <Sparkles className="text-amber-400" size={24} />
+                      Artistas
+                    </h3>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
+                    {artistas.slice(0, 15).map(artista => (
+                      <ArtistaCard
+                        key={artista.id}
+                        artista={artista}
+                        onClick={() => window.location.href = `/artista/${artista.slug}`}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {/* ====== SECTION: ENSENANZAS ====== */}
               <section className="px-4 md:px-6 py-6">

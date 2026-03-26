@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Contenido, ClasificacionIA, EvaluacionTeologica, ContenidoBiblico, GuiaEstudio, Comunidad, Playlist, PlaylistItem } from '@/types/content';
+import type { Contenido, ClasificacionIA, EvaluacionTeologica, ContenidoBiblico, GuiaEstudio, Comunidad, Playlist, PlaylistItem, Artista } from '@/types/content';
 
 // ===== HELPERS: convertir filas de DB a tipos de la app =====
 
@@ -78,6 +78,86 @@ function filaAComunidad(row: any): Comunidad {
     online: Math.floor(Math.random() * 50) + 5, // simulado por ahora
     tipo: row.tipo,
   };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function filaAArtista(row: any): Artista {
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    slug: row.slug,
+    imagen: row.imagen || '',
+    banner: row.banner || '',
+    bio: row.bio || '',
+    pais: row.pais || '',
+    generos: row.generos || [],
+    tipo: row.tipo || 'artista',
+    youtube_canal: row.youtube_canal || '',
+    spotify_id: row.spotify_id || '',
+    artistas_relacionados: row.artistas_relacionados || [],
+    seguidores: row.seguidores || 0,
+    verificado: row.verificado || false,
+  };
+}
+
+// ===== QUERIES DE ARTISTAS =====
+
+export async function obtenerArtistas(): Promise<Artista[]> {
+  const { data, error } = await supabase
+    .from('artistas')
+    .select('*')
+    .eq('activo', true)
+    .order('seguidores', { ascending: false });
+
+  if (error) { console.error('Error obteniendo artistas:', error); return []; }
+  return (data || []).map(filaAArtista);
+}
+
+export async function obtenerArtistaPorSlug(slug: string): Promise<Artista | null> {
+  const { data, error } = await supabase
+    .from('artistas')
+    .select('*')
+    .eq('slug', slug)
+    .single();
+
+  if (error || !data) return null;
+  const artista = filaAArtista(data);
+
+  // Get their content
+  const { data: contenido } = await supabase
+    .from('contenido')
+    .select('*')
+    .eq('artista_id', data.id)
+    .eq('publicado', true)
+    .eq('eval_aprobado', true)
+    .order('likes', { ascending: false });
+
+  artista.canciones = (contenido || []).map(filaAContenido);
+  return artista;
+}
+
+export async function obtenerArtistasRelacionados(slugs: string[]): Promise<Artista[]> {
+  if (!slugs.length) return [];
+  const { data, error } = await supabase
+    .from('artistas')
+    .select('*')
+    .in('slug', slugs)
+    .eq('activo', true);
+
+  if (error) return [];
+  return (data || []).map(filaAArtista);
+}
+
+export async function obtenerArtistasPorGenero(genero: string): Promise<Artista[]> {
+  const { data, error } = await supabase
+    .from('artistas')
+    .select('*')
+    .contains('generos', [genero])
+    .eq('activo', true)
+    .order('seguidores', { ascending: false });
+
+  if (error) return [];
+  return (data || []).map(filaAArtista);
 }
 
 // ===== QUERIES DE CONTENIDO =====

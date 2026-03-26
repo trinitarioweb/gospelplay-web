@@ -92,6 +92,7 @@ export interface Contenido {
   // Metadata básica
   titulo: string;
   artista: string;
+  artista_id?: string;
   descripcion: string;
   duracion: string;
   thumbnail: string;
@@ -176,6 +177,26 @@ export interface PlaylistItem {
   id: string;
   contenido: Contenido;
   orden: number;
+}
+
+// ===== ARTISTA =====
+
+export interface Artista {
+  id: string;
+  nombre: string;
+  slug: string;
+  imagen: string;
+  banner: string;
+  bio: string;
+  pais: string;
+  generos: string[];
+  tipo: 'artista' | 'banda' | 'pastor' | 'ministerio' | 'predicador';
+  youtube_canal: string;
+  spotify_id: string;
+  artistas_relacionados: string[]; // slugs
+  seguidores: number;
+  verificado: boolean;
+  canciones?: Contenido[]; // populated on profile
 }
 
 // ===== FILTROS DE BÚSQUEDA =====
