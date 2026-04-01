@@ -9,7 +9,7 @@ import AddContentModal from '@/components/AddContentModal';
 import { obtenerMusica, obtenerEnsenanzas, obtenerEstudios, obtenerTodoContenido, obtenerGuias, buscarContenido as buscarEnDB, obtenerPlaylists, obtenerPlaylist, crearPlaylist, eliminarDePlaylist, eliminarPlaylist, obtenerArtistas } from '@/lib/database';
 import { temasPopulares, librosBiblia, necesidades } from '@/lib/datos-ejemplo';
 import ArtistaCard from '@/components/ArtistaCard';
-import { usePlayer } from '@/context/PlayerContext';
+import { useFavorites } from '@/context/FavoritesContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Contenido, GuiaEstudio, FiltrosBusqueda, Playlist, Artista } from '@/types/content';
 
@@ -90,7 +90,7 @@ const LIBROS_RECOMENDADOS = [
 ];
 
 export default function HomePage() {
-  const { currentTrack, likedSongs, playTrack: contextPlayTrack, playFromList, toggleLike } = usePlayer();
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const { user, profile, signInWithGoogle, signOut, connectSpotify, disconnectSpotify } = useAuth();
 
   const [activeTab, setActiveTab] = useState('home');
@@ -129,10 +129,10 @@ export default function HomePage() {
   const [newPlaylistDesc, setNewPlaylistDesc] = useState('');
   const [creatingPlaylist, setCreatingPlaylist] = useState(false);
 
-  // playTrack wrapper - passes musica for auto-queue
-  const playTrack = useCallback((track: Contenido) => {
-    contextPlayTrack(track, musica);
-  }, [contextPlayTrack, musica]);
+  // Open content in external platform
+  const openContent = useCallback((contenido: Contenido) => {
+    window.open(contenido.url, '_blank', 'noopener,noreferrer');
+  }, []);
 
   // Cargar playlists
   const cargarPlaylists = useCallback(async () => {
@@ -190,9 +190,9 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [searchQuery, filtros.tipo, filtros.esCongreacional]);
 
-  const playFromPlaylist = (playlist: Playlist, startIndex: number) => {
-    const items = playlist.items.map(i => i.contenido);
-    playFromList(playlist.nombre, items, startIndex);
+  const openFromPlaylist = (playlist: Playlist, startIndex: number) => {
+    const item = playlist.items[startIndex]?.contenido;
+    if (item) window.open(item.url, '_blank', 'noopener,noreferrer');
   };
 
   // Filtrar musica por sub-seccion
@@ -379,7 +379,7 @@ export default function HomePage() {
                 <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
                   {[...musica].sort((a, b) => new Date(b.fechaCreacion || 0).getTime() - new Date(a.fechaCreacion || 0).getTime()).slice(0, 10).map(item => (
                     <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
-                      <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                      <ContentCard contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} onPlaylistsChanged={cargarPlaylists} />
                     </div>
                   ))}
                 </div>
@@ -394,7 +394,7 @@ export default function HomePage() {
                 <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
                   {ensenanzas.slice(0, 10).map(item => (
                     <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
-                      <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                      <ContentCard contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} onPlaylistsChanged={cargarPlaylists} />
                     </div>
                   ))}
                 </div>
@@ -497,7 +497,7 @@ export default function HomePage() {
                     <span className="w-8 text-center">#</span><span className="w-12"></span><span className="flex-1">Titulo</span><span className="w-28 hidden sm:block">Artista</span><span className="w-24 hidden md:block">Genero</span><span className="w-14 text-right">Duracion</span>
                   </div>
                   {musicaFiltrada().map((item, idx) => (
-                    <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playTrack(item)}>
+                    <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => openContent(item)}>
                       <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
                       <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
                       <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
@@ -548,7 +548,7 @@ export default function HomePage() {
                 <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
                   {[...ensenanzas].sort((a, b) => new Date(b.fechaCreacion || 0).getTime() - new Date(a.fechaCreacion || 0).getTime()).slice(0, 10).map(item => (
                     <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
-                      <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                      <ContentCard contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} onPlaylistsChanged={cargarPlaylists} />
                     </div>
                   ))}
                 </div>
@@ -562,7 +562,7 @@ export default function HomePage() {
                     <span className="w-8 text-center">#</span><span className="w-12"></span><span className="flex-1">Titulo</span><span className="w-28 hidden sm:block">Predicador</span><span className="w-12 text-right hidden sm:block">Score</span><span className="w-14 text-right">Duracion</span>
                   </div>
                   {ensenanzas.map((item, idx) => (
-                    <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playTrack(item)}>
+                    <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => openContent(item)}>
                       <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
                       <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
                       <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
@@ -757,7 +757,7 @@ export default function HomePage() {
                             <span className="w-14 text-right">Duracion</span>
                           </div>
                           {genreItems.map((item, idx) => (
-                            <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playTrack(item)}>
+                            <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => openContent(item)}>
                               <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
                               <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
                               <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
@@ -786,7 +786,7 @@ export default function HomePage() {
                       <h3 className="font-bold text-base mb-3 text-white">Guias de Estudio</h3>
                       <div className="space-y-2">
                         {buscarGuias().map(guia => (
-                          <GuiaEstudioCard key={guia.id} guia={guia} onPlay={playTrack} expanded={expandedGuia === guia.id} onToggle={() => setExpandedGuia(expandedGuia === guia.id ? null : guia.id)} />
+                          <GuiaEstudioCard key={guia.id} guia={guia} expanded={expandedGuia === guia.id} onToggle={() => setExpandedGuia(expandedGuia === guia.id ? null : guia.id)} />
                         ))}
                       </div>
                     </div>
@@ -797,7 +797,7 @@ export default function HomePage() {
                     {resultadosBusqueda.map((item, idx) => (
                       <div key={item.id} className="flex items-center gap-3 px-2">
                         <span className="text-sm font-bold text-[#6a6a6a] w-6 text-right">{idx + 1}</span>
-                        <div className="flex-1"><ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} compact onPlaylistsChanged={cargarPlaylists} /></div>
+                        <div className="flex-1"><ContentCard contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} compact onPlaylistsChanged={cargarPlaylists} /></div>
                       </div>
                     ))}
                   </div>
@@ -904,16 +904,7 @@ export default function HomePage() {
 
                   {allGenreSongs.length > 0 && (
                     <div className="flex items-center gap-3 mt-6">
-                      <button
-                        onClick={() => {
-                          const tracksToPlay = topTracksReal.length > 0 ? topTracksReal : allGenreSongs;
-                          playFromList(`${genreLabel} Mix`, [...tracksToPlay].sort(() => Math.random() - 0.5), 0);
-                        }}
-                        className="w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-400 hover:scale-105 flex items-center justify-center shadow-lg shadow-black/40 transition-all"
-                      >
-                        <Play size={24} fill="black" className="text-black ml-0.5" />
-                      </button>
-                      <span className="text-white/70 text-sm font-medium">Reproducir mix</span>
+                      <span className="text-white/70 text-sm font-medium">{allGenreSongs.length} canciones disponibles</span>
                     </div>
                   )}
                 </div>
@@ -934,9 +925,9 @@ export default function HomePage() {
                       {topTracksReal.slice(0, 15).map((item, idx) => {
                         const trackInfo = genreData?.topTracks.find(t => t.contenidoId === item.id);
                         return (
-                          <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playFromList(`${genreLabel} Top`, topTracksReal, idx)}>
+                          <div key={item.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => openContent(item)}>
                             <span className="w-8 text-center text-lg font-extrabold text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
-                            <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
+                            <span className="w-8 text-center hidden group-hover:block"><ExternalLink size={14} className="text-white mx-auto" /></span>
                             <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
                               {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#6a6a6a] text-sm">&#9835;</div>}
                             </div>
@@ -947,8 +938,8 @@ export default function HomePage() {
                             {trackInfo && (
                               <span className="text-[10px] text-[#6a6a6a] hidden sm:block">{(trackInfo.listeners / 1000).toFixed(0)}K oyentes</span>
                             )}
-                            <button onClick={(e) => { e.stopPropagation(); toggleLike(item.id); }} className="p-1.5">
-                              <Heart size={16} className={likedSongs.has(item.id) ? 'text-amber-400 fill-amber-400' : 'text-[#6a6a6a] hover:text-white'} />
+                            <button onClick={(e) => { e.stopPropagation(); toggleFavorite(item.id); }} className="p-1.5">
+                              <Heart size={16} className={isFavorite(item.id) ? 'text-amber-400 fill-amber-400' : 'text-[#6a6a6a] hover:text-white'} />
                             </button>
                           </div>
                         );
@@ -979,7 +970,7 @@ export default function HomePage() {
                     <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
                       {recientes.slice(0, 12).map(item => (
                         <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
-                          <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                          <ContentCard contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} onPlaylistsChanged={cargarPlaylists} />
                         </div>
                       ))}
                     </div>
@@ -1030,7 +1021,7 @@ export default function HomePage() {
                         <span className="w-8 text-center">#</span><span className="w-12"></span><span className="flex-1">Titulo</span><span className="w-28 hidden sm:block">Artista</span><span className="w-14 text-right">Duracion</span>
                       </div>
                       {allGenreSongs.map((item, idx) => (
-                        <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playFromList(genreLabel, allGenreSongs, idx)}>
+                        <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => openContent(item)}>
                           <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
                           <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
                           <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
@@ -1061,7 +1052,7 @@ export default function HomePage() {
                 {musica.sort((a, b) => b.likes - a.likes).slice(0, 5).map((item, idx) => (
                   <div key={item.id} className="flex items-center gap-3 px-2">
                     <span className="text-lg font-extrabold text-[#6a6a6a] w-6 text-right">{idx + 1}</span>
-                    <div className="flex-1"><ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} compact onPlaylistsChanged={cargarPlaylists} /></div>
+                    <div className="flex-1"><ContentCard contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} compact onPlaylistsChanged={cargarPlaylists} /></div>
                   </div>
                 ))}
               </div>
@@ -1071,7 +1062,7 @@ export default function HomePage() {
                 {ensenanzas.sort((a, b) => b.likes - a.likes).slice(0, 5).map((item, idx) => (
                   <div key={item.id} className="flex items-center gap-3 px-2">
                     <span className="text-lg font-extrabold text-[#6a6a6a] w-6 text-right">{idx + 1}</span>
-                    <div className="flex-1"><ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} compact onPlaylistsChanged={cargarPlaylists} /></div>
+                    <div className="flex-1"><ContentCard contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} compact onPlaylistsChanged={cargarPlaylists} /></div>
                   </div>
                 ))}
               </div>
@@ -1088,14 +1079,14 @@ export default function HomePage() {
               <h3 className="font-bold text-base mb-3 text-white">Guias por Porcion Biblica</h3>
               <div className="space-y-2 mb-8">
                 {guiasEstudio.map(guia => (
-                  <GuiaEstudioCard key={guia.id} guia={guia} onPlay={playTrack} expanded={expandedGuia === guia.id} onToggle={() => setExpandedGuia(expandedGuia === guia.id ? null : guia.id)} />
+                  <GuiaEstudioCard key={guia.id} guia={guia} expanded={expandedGuia === guia.id} onToggle={() => setExpandedGuia(expandedGuia === guia.id ? null : guia.id)} />
                 ))}
               </div>
 
               <h3 className="font-bold text-base mb-3 text-white">Estudios Individuales</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {estudiosData.map(item => (
-                  <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                  <ContentCard key={item.id} contenido={item} onLike={toggleFavorite} isLiked={isFavorite(item.id)} onPlaylistsChanged={cargarPlaylists} />
                 ))}
               </div>
               <div className="h-24"></div>
@@ -1105,7 +1096,7 @@ export default function HomePage() {
 
           {/* ===== BIBLIOTECA ===== */}
           {activeTab === 'biblioteca' && (() => {
-            const liked = todoContenido.filter(c => likedSongs.has(c.id));
+            const liked = todoContenido.filter(c => isFavorite(c.id));
             const likedMusica = liked.filter(c => c.clasificacion.tipo === 'musica');
             const likedPredicas = liked.filter(c => c.clasificacion.tipo === 'predicacion');
             const likedEstudios = liked.filter(c => c.clasificacion.tipo === 'estudio_biblico');
@@ -1122,7 +1113,7 @@ export default function HomePage() {
                       <section className="mb-6">
                         <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2"><Music size={16} className="text-amber-400" /> Musica ({likedMusica.length})</h3>
                         <div className="bg-[#181818] rounded-lg overflow-hidden">
-                          {likedMusica.map(item => <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
+                          {likedMusica.map(item => <ContentCard key={item.id} contenido={item} onLike={toggleFavorite} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
                         </div>
                       </section>
                     )}
@@ -1131,7 +1122,7 @@ export default function HomePage() {
                       <section className="mb-6">
                         <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2"><Mic size={16} className="text-amber-400" /> Predicas ({likedPredicas.length})</h3>
                         <div className="bg-[#181818] rounded-lg overflow-hidden">
-                          {likedPredicas.map(item => <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
+                          {likedPredicas.map(item => <ContentCard key={item.id} contenido={item} onLike={toggleFavorite} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
                         </div>
                       </section>
                     )}
@@ -1140,7 +1131,7 @@ export default function HomePage() {
                       <section className="mb-6">
                         <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2"><BookOpen size={16} className="text-amber-400" /> Estudios ({likedEstudios.length})</h3>
                         <div className="bg-[#181818] rounded-lg overflow-hidden">
-                          {likedEstudios.map(item => <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
+                          {likedEstudios.map(item => <ContentCard key={item.id} contenido={item} onLike={toggleFavorite} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
                         </div>
                       </section>
                     )}
@@ -1149,7 +1140,7 @@ export default function HomePage() {
                       <section className="mb-6">
                         <h3 className="text-base font-bold text-white mb-2">Otros ({likedOtros.length})</h3>
                         <div className="bg-[#181818] rounded-lg overflow-hidden">
-                          {likedOtros.map(item => <ContentCard key={item.id} contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
+                          {likedOtros.map(item => <ContentCard key={item.id} contenido={item} onLike={toggleFavorite} isLiked={true} compact onPlaylistsChanged={cargarPlaylists} />)}
                         </div>
                       </section>
                     )}
@@ -1199,7 +1190,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-4 mt-6">
                       {activePlaylist.items.length > 0 && (
                         <button
-                          onClick={() => playFromPlaylist(activePlaylist, 0)}
+                          onClick={() => openFromPlaylist(activePlaylist, 0)}
                           className="w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-400 hover:scale-105 flex items-center justify-center shadow-lg shadow-black/40 transition-all"
                         >
                           <Play size={24} fill="black" className="text-black ml-0.5" />
@@ -1231,7 +1222,7 @@ export default function HomePage() {
                           <div
                             key={item.id}
                             className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer"
-                            onClick={() => playFromPlaylist(activePlaylist, idx)}
+                            onClick={() => openFromPlaylist(activePlaylist, idx)}
                           >
                             {/* Number */}
                             <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
@@ -1354,7 +1345,7 @@ export default function HomePage() {
                     <h4 className="font-bold text-white mb-3">Tu actividad</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-[#282828] rounded-lg p-4 text-center">
-                        <p className="text-2xl font-bold text-amber-400">{likedSongs.size}</p>
+                        <p className="text-2xl font-bold text-amber-400">{favorites.size}</p>
                         <p className="text-xs text-[#6a6a6a]">Favoritos</p>
                       </div>
                       <div className="bg-[#282828] rounded-lg p-4 text-center">
@@ -1456,7 +1447,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {currentTrack && <div className="h-16" />}
     </div>
   );
 }

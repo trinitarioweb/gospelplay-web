@@ -7,6 +7,57 @@ const LASTFM_KEY = process.env.LASTFM_API_KEY || '';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function filaAContenido(row: any) {
+  return {
+    id: row.id,
+    url: row.url,
+    plataforma: row.plataforma,
+    titulo: row.titulo,
+    artista: row.artista,
+    artista_id: row.artista_id,
+    descripcion: row.descripcion || '',
+    duracion: row.duracion || '',
+    thumbnail: row.thumbnail || '',
+    clasificacion: {
+      tipo: row.tipo,
+      categoria: row.categoria,
+      generoMusical: row.genero_musical,
+      esCongreacional: row.es_congregacional,
+      tieneMensaje: row.tiene_mensaje,
+      esInstrumental: row.es_instrumental || false,
+      momentoDelCulto: row.momento_del_culto,
+      energia: row.energia,
+      nivel: row.nivel,
+    },
+    evaluacion: {
+      cristocentrico: row.eval_cristocentrico,
+      fidelidadBiblica: row.eval_fidelidad_biblica,
+      profundidad: row.eval_profundidad,
+      edificante: row.eval_edificante,
+      doctrinaSana: row.eval_doctrina_sana,
+      puntuacionTotal: row.eval_puntuacion_total,
+      aprobado: row.eval_aprobado,
+      notas: row.eval_notas || '',
+    },
+    contenidoBiblico: {
+      pasajes: row.pasajes || [],
+      versiculosClave: row.versiculos_clave || [],
+      temas: row.temas || [],
+      personajes: row.personajes || [],
+      doctrina: row.doctrina || [],
+    },
+    aptoPara: row.apto_para || [],
+    audiencia: row.audiencia || [],
+    likes: row.likes || 0,
+    guardados: row.guardados || 0,
+    compartidos: row.compartidos || 0,
+    creadoPor: row.creado_por || 'sistema',
+    fechaCreacion: row.created_at,
+    revisadoPorIA: row.revisado_por_ia,
+  };
+}
+
 async function lastfmSimilarArtists(artistName: string, limit = 15) {
   if (!LASTFM_KEY) return [];
   try {
@@ -151,7 +202,7 @@ export async function GET(request: NextRequest) {
     nombre: trackName
       ? `Radio: ${trackName} - ${artistName}`
       : `Radio: ${artistName}`,
-    tracks: radioTracks,
+    tracks: radioTracks.map(filaAContenido),
     totalTracks: radioTracks.length,
     basedOn: {
       artist: artistName,

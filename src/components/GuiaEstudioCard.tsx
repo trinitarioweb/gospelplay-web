@@ -1,16 +1,16 @@
 'use client';
 
-import { BookOpen, Play, ChevronRight } from 'lucide-react';
-import type { GuiaEstudio, Contenido } from '@/types/content';
+import { BookOpen, ExternalLink, ChevronRight } from 'lucide-react';
+import type { GuiaEstudio } from '@/types/content';
 
 interface GuiaEstudioCardProps {
   guia: GuiaEstudio;
-  onPlay: (contenido: Contenido) => void;
   expanded?: boolean;
   onToggle?: () => void;
+  onOpen?: (contenido: { url: string }) => void;
 }
 
-export default function GuiaEstudioCard({ guia, onPlay, expanded = false, onToggle }: GuiaEstudioCardProps) {
+export default function GuiaEstudioCard({ guia, expanded = false, onToggle, onOpen }: GuiaEstudioCardProps) {
   return (
     <div className="bg-[#181818] rounded-lg overflow-hidden hover:bg-[#1f1f1f] transition-colors">
       {/* Header */}
@@ -39,12 +39,10 @@ export default function GuiaEstudioCard({ guia, onPlay, expanded = false, onTogg
       {/* Expanded content */}
       {expanded && (
         <div className="border-t border-white/5">
-          {/* Context */}
           <div className="p-4 bg-white/[0.02]">
             <p className="text-sm text-[#b3b3b3] leading-relaxed">{guia.contexto}</p>
           </div>
 
-          {/* Study path */}
           <div className="p-4">
             <h4 className="font-semibold text-sm text-amber-400 mb-3">Ruta de Estudio</h4>
             <div className="space-y-1">
@@ -58,25 +56,29 @@ export default function GuiaEstudioCard({ guia, onPlay, expanded = false, onTogg
                     <p className="font-medium text-sm text-white truncate">{paso.contenido.titulo}</p>
                     <p className="text-xs text-[#b3b3b3] truncate">{paso.contenido.artista}</p>
                   </div>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    paso.contenido.evaluacion.puntuacionTotal >= 85
-                      ? 'bg-amber-500/20 text-amber-400'
-                      : 'bg-emerald-500/20 text-emerald-400'
-                  }`}>
-                    {paso.contenido.evaluacion.puntuacionTotal}
-                  </span>
-                  <button
-                    onClick={() => onPlay(paso.contenido)}
+                  {paso.contenido.evaluacion?.puntuacionTotal != null && (
+                    <span className={`text-[11px] font-bold ${
+                      paso.contenido.evaluacion.puntuacionTotal >= 85
+                        ? 'text-amber-400'
+                        : 'text-emerald-400'
+                    }`}>
+                      {'★'.repeat(Math.round(paso.contenido.evaluacion.puntuacionTotal / 20))}
+                    </span>
+                  )}
+                  <a
+                    href={paso.contenido.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="p-2 rounded-full bg-amber-500 hover:bg-amber-400 hover:scale-105 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
                   >
-                    <Play size={12} fill="black" className="text-black ml-0.5" />
-                  </button>
+                    <ExternalLink size={12} className="text-black" />
+                  </a>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Related */}
           <div className="px-4 pb-4">
             <h4 className="font-semibold text-sm text-[#b3b3b3] mb-2">Temas Relacionados</h4>
             <div className="flex flex-wrap gap-1.5 mb-3">

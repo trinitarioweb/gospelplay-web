@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { ArrowLeft, CheckCircle, Play, Shuffle, Heart, Share2, Loader2, Radio } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Heart, Share2, Loader2, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { obtenerArtistaPorSlug, obtenerArtistasRelacionados } from '@/lib/database';
-import { usePlayer } from '@/context/PlayerContext';
+import { useFavorites } from '@/context/FavoritesContext';
 import type { Artista, Contenido } from '@/types/content';
 import ArtistaCard from '@/components/ArtistaCard';
 import ContentCard from '@/components/ContentCard';
@@ -14,7 +14,7 @@ const generosLabels: Record<string, string> = {
   pop_cristiano: 'Pop Cristiano',
   rock_cristiano: 'Rock Cristiano',
   balada_cristiana: 'Balada',
-  reggaeton_cristiano: 'Reggaetón Cristiano',
+  reggaeton_cristiano: 'Reggaeton Cristiano',
   salsa_cristiana: 'Salsa Cristiana',
   hip_hop_cristiano: 'Hip Hop Cristiano',
   himnos_clasicos: 'Himnos',
@@ -32,7 +32,7 @@ const tipoLabels: Record<string, string> = {
 export default function ArtistaPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
-  const { playTrack, playFromList, startRadio, radioLoading, toggleLike, likedSongs } = usePlayer();
+  const { toggleFavorite, isFavorite } = useFavorites();
   const [artista, setArtista] = useState<Artista | null>(null);
   const [relacionados, setRelacionados] = useState<Artista[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,13 +54,11 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
             setEnrichResult(data);
             setEnriching(false);
 
-            // If new songs were added, reload artist data
             if (data.cancionesAgregadas > 0) {
               const refreshed = await obtenerArtistaPorSlug(slug);
               if (refreshed) setArtista(refreshed);
             }
 
-            // If similar artists were found, reload related
             if (data.similaresEnCatalogo > 0) {
               const refreshedArtist = await obtenerArtistaPorSlug(slug);
               if (refreshedArtist?.artistas_relacionados?.length) {
@@ -71,7 +69,6 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
           })
           .catch(() => setEnriching(false));
 
-        // Load existing related artists
         if (a.artistas_relacionados?.length) {
           const rel = await obtenerArtistasRelacionados(a.artistas_relacionados);
           setRelacionados(rel);
@@ -104,6 +101,10 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
 
   const canciones = artista.canciones || [];
   const totalCanciones = canciones.length;
+
+  // Group songs by platform for "where to listen" links
+  const spotifySongs = canciones.filter(c => c.plataforma === 'spotify');
+  const youtubeSongs = canciones.filter(c => c.plataforma === 'youtube');
 
   return (
     <div className="min-h-screen bg-[#121212] text-white">
@@ -151,44 +152,41 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="px-6 py-4 flex items-center gap-3">
-        <button
-          onClick={() => { if (canciones.length > 0) playFromList(artista.nombre, canciones, 0); }}
-          className="w-14 h-14 bg-amber-500 rounded-full flex items-center justify-center hover:bg-amber-400 transition shadow-lg"
-        >
-          <Play size={28} fill="black" className="text-black ml-1" />
+      {/* Actions - where to listen */}
+      <div className="px-6 py-4 flex items-center gap-3 flex-wrap">
+        {youtubeSongs.length > 0 && (
+          <a
+            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(artista.nombre + ' official')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 h-10 bg-red-600 rounded-full text-white text-sm font-bold hover:bg-red-500 transition"
+          >
+            <ExternalLink size={16} /> YouTube
+          </a>
+        )}
+        {spotifySongs.length > 0 && (
+          <a
+            href={`https://open.spotify.com/search/${encodeURIComponent(artista.nombre)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 h-10 bg-green-600 rounded-full text-white text-sm font-bold hover:bg-green-500 transition"
+          >
+            <ExternalLink size={16} /> Spotify
+          </a>
+        )}
+        <button className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition">
+          <Heart size={18} />
         </button>
         <button
           onClick={() => {
-            if (canciones.length > 0) {
-              const shuffled = [...canciones].sort(() => Math.random() - 0.5);
-              playFromList(artista.nombre, shuffled, 0);
+            if (navigator.share) {
+              navigator.share({ title: artista.nombre, text: `Mira ${artista.nombre} en GospelPlay`, url: window.location.href });
+            } else {
+              navigator.clipboard.writeText(window.location.href);
             }
           }}
           className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition"
         >
-          <Shuffle size={18} />
-        </button>
-
-        {/* Radio button */}
-        <button
-          onClick={() => startRadio(artista.nombre)}
-          disabled={radioLoading}
-          className="flex items-center gap-2 px-4 h-10 bg-gradient-to-r from-amber-600 to-amber-500 rounded-full text-black text-sm font-bold hover:brightness-110 transition disabled:opacity-50"
-        >
-          {radioLoading ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Radio size={16} />
-          )}
-          Iniciar Radio
-        </button>
-
-        <button className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition">
-          <Heart size={18} />
-        </button>
-        <button className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition">
           <Share2 size={18} />
         </button>
       </div>
@@ -218,35 +216,22 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
         <div className="px-6 py-4">
           <h2 className="text-xl font-bold mb-4">Popular</h2>
           <div className="space-y-1">
-            {canciones.slice(0, 15).map((cancion: Contenido, index: number) => (
-              <div key={cancion.id} className="flex items-center gap-1">
-                <ContentCard
-                  contenido={cancion}
-                  compact
-                  index={index + 1}
-                  onPlay={() => playTrack(cancion, canciones)}
-                  onLike={toggleLike}
-                  isLiked={likedSongs.has(cancion.id)}
-                />
-                {/* Mini radio button per song */}
-                <button
-                  onClick={() => startRadio(artista.nombre, cancion.titulo)}
-                  className="flex-shrink-0 p-2 text-[#6a6a6a] hover:text-amber-400 transition"
-                  title="Iniciar radio con esta cancion"
-                >
-                  <Radio size={14} />
-                </button>
-              </div>
+            {canciones.slice(0, 20).map((cancion: Contenido, index: number) => (
+              <ContentCard
+                key={cancion.id}
+                contenido={cancion}
+                compact
+                index={index + 1}
+                onLike={toggleFavorite}
+                isLiked={isFavorite(cancion.id)}
+              />
             ))}
           </div>
 
-          {canciones.length > 15 && (
-            <button
-              onClick={() => playFromList(`${artista.nombre} - Todas`, canciones, 0)}
-              className="mt-4 text-sm text-[#b3b3b3] hover:text-white font-semibold transition"
-            >
-              Ver todas ({canciones.length} canciones)
-            </button>
+          {canciones.length > 20 && (
+            <p className="mt-4 text-sm text-[#b3b3b3] font-semibold">
+              y {canciones.length - 20} canciones mas
+            </p>
           )}
         </div>
       )}
@@ -267,7 +252,7 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
         </div>
       )}
 
-      <div className="h-24" />
+      <div className="h-12" />
     </div>
   );
 }

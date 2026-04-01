@@ -1,14 +1,14 @@
 'use client';
 
-import { PlayerProvider } from '@/context/PlayerContext';
+import { FavoritesProvider } from '@/context/FavoritesContext';
 import { AuthProvider } from '@/context/AuthContext';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <PlayerProvider>
+      <FavoritesProvider>
         {children}
-      </PlayerProvider>
+      </FavoritesProvider>
     </AuthProvider>
   );
 }
