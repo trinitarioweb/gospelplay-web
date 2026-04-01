@@ -101,6 +101,7 @@ export default function HomePage() {
   const [filtros, setFiltros] = useState<FiltrosBusqueda>({});
   const [musicaSubFilter, setMusicaSubFilter] = useState<'todo' | 'congregacional' | 'worship' | 'himnos' | 'urbano'>('todo');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [activeGenre, setActiveGenre] = useState<string | null>(null);
 
   // Datos de Supabase
   const [musica, setMusica] = useState<Contenido[]>([]);
@@ -244,11 +245,20 @@ export default function HomePage() {
     cargarPlaylists();
   };
 
+  // Navigate to genre home
+  const navigateToGenre = (genre: string) => {
+    setActiveGenre(genre);
+    setActiveTab('genero');
+  };
+
   // When switching tabs (non-playlist), clear playlist selection
   const handleSetActiveTab = (tab: string) => {
     setActiveTab(tab);
     if (tab !== 'playlist') {
       setActivePlaylistId(null);
+    }
+    if (tab !== 'genero') {
+      setActiveGenre(null);
     }
   };
 
@@ -322,12 +332,12 @@ export default function HomePage() {
                     const gradient = GENRE_COLORS[mix.genre] || 'from-gray-600 to-gray-900';
                     const label = GENRE_LABELS[mix.genre] || mix.genre;
                     return (
-                      <button key={mix.genre} onClick={() => { const gs = musica.filter(m => m.clasificacion.generoMusical === mix.genre); if (gs.length > 0) playFromList(`Mix: ${label}`, gs, 0); }}
+                      <button key={mix.genre} onClick={() => navigateToGenre(mix.genre)}
                         className={`relative overflow-hidden rounded-lg bg-gradient-to-br ${gradient} p-4 h-24 md:h-28 text-left group hover:brightness-110 transition-all`}>
                         <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
                           <Play size={18} fill="black" className="text-black ml-0.5" />
                         </div>
-                        <p className="font-bold text-white text-sm md:text-base">{label} Mix</p>
+                        <p className="font-bold text-white text-sm md:text-base">{label}</p>
                         <p className="text-white/70 text-xs mt-1 line-clamp-2">{mix.artists.join(', ')}</p>
                       </button>
                     );
@@ -404,7 +414,7 @@ export default function HomePage() {
                 <h3 className="text-xl md:text-2xl font-bold text-white mb-4">Explora generos</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {Object.entries(GENRE_LABELS).filter(([k]) => k !== 'predicacion').map(([key, label]) => (
-                    <button key={key} onClick={() => { setGenreFilter(key); handleSetActiveTab('buscar'); }}
+                    <button key={key} onClick={() => navigateToGenre(key)}
                       className={`rounded-lg bg-gradient-to-br ${GENRE_COLORS[key] || 'from-gray-600 to-gray-900'} p-4 h-24 text-left hover:brightness-110 transition-all`}>
                       <p className="font-bold text-white text-sm md:text-base">{label}</p>
                     </button>
@@ -444,12 +454,12 @@ export default function HomePage() {
                     const gradient = GENRE_COLORS[mix.genre] || 'from-gray-600 to-gray-900';
                     const label = GENRE_LABELS[mix.genre] || mix.genre;
                     return (
-                      <button key={mix.genre} onClick={() => { const gs = musica.filter(m => m.clasificacion.generoMusical === mix.genre); if (gs.length > 0) playFromList(`Mix: ${label}`, gs, 0); }}
+                      <button key={mix.genre} onClick={() => navigateToGenre(mix.genre)}
                         className={`relative overflow-hidden rounded-lg bg-gradient-to-br ${gradient} p-4 h-24 text-left group hover:brightness-110 transition-all`}>
                         <div className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
                           <Play size={18} fill="black" className="text-black ml-0.5" />
                         </div>
-                        <p className="font-bold text-white text-sm">{label} Mix</p>
+                        <p className="font-bold text-white text-sm">{label}</p>
                         <p className="text-white/70 text-xs mt-1">{mix.artists.join(', ')}</p>
                       </button>
                     );
@@ -792,7 +802,7 @@ export default function HomePage() {
                         return (
                           <button
                             key={key}
-                            onClick={() => setGenreFilter(key)}
+                            onClick={() => navigateToGenre(key)}
                             className={`rounded-lg bg-gradient-to-br ${gradient} p-4 h-24 text-left hover:brightness-110 transition-all`}
                           >
                             <p className="font-bold text-white text-sm md:text-base">{label}</p>
@@ -835,6 +845,151 @@ export default function HomePage() {
               <div className="h-24"></div>
             </div>
           )}
+
+          {/* ===== GENRE HOME ===== */}
+          {activeTab === 'genero' && activeGenre && (() => {
+            const genreLabel = GENRE_LABELS[activeGenre] || activeGenre;
+            const gradient = GENRE_COLORS[activeGenre] || 'from-gray-600 to-gray-900';
+            const allGenreSongs = musica.filter(m => m.clasificacion.generoMusical === activeGenre);
+            const genreArtists = artistas.filter(a => {
+              const artistSongs = allGenreSongs.filter(s => s.artista_id === a.id);
+              return artistSongs.length > 0;
+            });
+            const recientes = [...allGenreSongs].sort((a, b) => new Date(b.fechaCreacion || 0).getTime() - new Date(a.fechaCreacion || 0).getTime());
+            const populares = [...allGenreSongs].sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            const mejorEvaluadas = [...allGenreSongs].sort((a, b) => (b.evaluacion.puntuacionTotal || 0) - (a.evaluacion.puntuacionTotal || 0));
+            // Group related genres for "También te puede gustar"
+            const relatedGenres = Object.keys(GENRE_LABELS).filter(g => g !== activeGenre && g !== 'predicacion');
+
+            return (
+              <div className="section-fade">
+                {/* Hero banner */}
+                <div className={`relative bg-gradient-to-b ${gradient} px-4 md:px-6 pt-12 pb-8`}>
+                  <button onClick={() => handleSetActiveTab('home')} className="absolute top-4 left-4 text-white/70 hover:text-white text-sm flex items-center gap-1">
+                    ← Inicio
+                  </button>
+                  <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-2">{genreLabel}</h1>
+                  <p className="text-white/70 text-sm">{allGenreSongs.length} canciones · {genreArtists.length} artistas</p>
+
+                  {/* Play all button */}
+                  {allGenreSongs.length > 0 && (
+                    <div className="flex items-center gap-3 mt-6">
+                      <button
+                        onClick={() => playFromList(`${genreLabel} Mix`, allGenreSongs.sort(() => Math.random() - 0.5), 0)}
+                        className="w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-400 hover:scale-105 flex items-center justify-center shadow-lg shadow-black/40 transition-all"
+                      >
+                        <Play size={24} fill="black" className="text-black ml-0.5" />
+                      </button>
+                      <span className="text-white/70 text-sm font-medium">Reproducir todo aleatorio</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Recomendados - best rated songs */}
+                {mejorEvaluadas.length > 0 && (
+                  <section className="px-4 md:px-6 py-4">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">⭐ Recomendados</h3>
+                    <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                      {mejorEvaluadas.slice(0, 12).map(item => (
+                        <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
+                          <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Últimos lanzamientos */}
+                {recientes.length > 0 && (
+                  <section className="px-4 md:px-6 py-4">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2"><Clock size={18} className="text-amber-400" /> Ultimos lanzamientos</h3>
+                    <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                      {recientes.slice(0, 12).map(item => (
+                        <div key={item.id} className="flex-shrink-0 w-44 md:w-48">
+                          <ContentCard contenido={item} onPlay={playTrack} onLike={toggleLike} isLiked={likedSongs.has(item.id)} onPlaylistsChanged={cargarPlaylists} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Lo más popular */}
+                {populares.length > 0 && (
+                  <section className="px-4 md:px-6 py-4">
+                    <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2"><TrendingUp size={18} className="text-amber-400" /> Lo mas escuchado</h3>
+                    <div className="bg-[#181818] rounded-lg overflow-hidden">
+                      {populares.slice(0, 10).map((item, idx) => (
+                        <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playFromList(`${genreLabel} Popular`, populares, idx)}>
+                          <span className="w-8 text-center text-lg font-extrabold text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
+                          <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
+                          <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
+                            {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#6a6a6a] text-sm">&#9835;</div>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{item.titulo}</p>
+                            <p className="text-xs text-[#b3b3b3] truncate">{item.artista}</p>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); toggleLike(item.id); }} className="p-1.5">
+                            <Heart size={16} className={likedSongs.has(item.id) ? 'text-amber-400 fill-amber-400' : 'text-[#6a6a6a] hover:text-white'} />
+                          </button>
+                          <span className="w-14 text-right text-xs text-[#6a6a6a]">{item.duracion}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Artistas del género */}
+                {genreArtists.length > 0 && (
+                  <section className="px-4 md:px-6 py-4">
+                    <h3 className="text-lg font-bold text-white mb-3">Artistas de {genreLabel}</h3>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
+                      {genreArtists.slice(0, 20).map(a => <ArtistaCard key={a.id} artista={a} onClick={() => window.location.href = `/artista/${a.slug}`} />)}
+                    </div>
+                  </section>
+                )}
+
+                {/* También te puede gustar */}
+                <section className="px-4 md:px-6 py-4">
+                  <h3 className="text-lg font-bold text-white mb-3">Tambien te puede gustar</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {relatedGenres.slice(0, 4).map(key => (
+                      <button key={key} onClick={() => navigateToGenre(key)}
+                        className={`rounded-lg bg-gradient-to-br ${GENRE_COLORS[key] || 'from-gray-600 to-gray-900'} p-4 h-20 text-left hover:brightness-110 transition-all`}>
+                        <p className="font-bold text-white text-sm">{GENRE_LABELS[key]}</p>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Todas las canciones */}
+                {allGenreSongs.length > 0 && (
+                  <section className="px-4 md:px-6 py-4">
+                    <h3 className="text-lg font-bold text-white mb-3">Todas las canciones</h3>
+                    <div className="bg-[#181818] rounded-lg overflow-hidden">
+                      <div className="flex items-center gap-3 px-4 py-2 border-b border-white/5 text-xs text-[#6a6a6a] font-medium">
+                        <span className="w-8 text-center">#</span><span className="w-12"></span><span className="flex-1">Titulo</span><span className="w-28 hidden sm:block">Artista</span><span className="w-14 text-right">Duracion</span>
+                      </div>
+                      {allGenreSongs.map((item, idx) => (
+                        <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-[#282828] transition-colors group cursor-pointer" onClick={() => playFromList(genreLabel, allGenreSongs, idx)}>
+                          <span className="w-8 text-center text-sm text-[#6a6a6a] group-hover:hidden">{idx + 1}</span>
+                          <span className="w-8 text-center hidden group-hover:block"><Play size={14} fill="white" className="text-white mx-auto" /></span>
+                          <div className="w-12 h-10 rounded bg-[#282828] flex-shrink-0 overflow-hidden">
+                            {item.thumbnail ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#6a6a6a] text-sm">&#9835;</div>}
+                          </div>
+                          <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">{item.titulo}</p><p className="text-xs text-[#b3b3b3] truncate sm:hidden">{item.artista}</p></div>
+                          <span className="w-28 text-xs text-[#b3b3b3] truncate hidden sm:block">{item.artista}</span>
+                          <span className="w-14 text-right text-xs text-[#6a6a6a]">{item.duracion}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                <div className="h-32"></div>
+              </div>
+            );
+          })()}
 
           {/* ===== TRENDING ===== */}
           {activeTab === 'trending' && (
