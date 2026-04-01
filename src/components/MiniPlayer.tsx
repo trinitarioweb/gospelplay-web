@@ -22,6 +22,8 @@ interface MiniPlayerProps {
   onPrevious?: () => void;
   isLiked?: boolean;
   onLike?: (id: string) => void;
+  onStartRadio?: (artist: string, track?: string) => void;
+  radioLoading?: boolean;
 }
 
 function extraerYouTubeId(url: string): string | null {
@@ -73,7 +75,7 @@ interface YTPlayer {
   loadVideoById: (videoId: string) => void;
 }
 
-export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, playlistContext, onNext, onPrevious, isLiked, onLike }: MiniPlayerProps) {
+export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, playlistContext, onNext, onPrevious, isLiked, onLike, onStartRadio, radioLoading }: MiniPlayerProps) {
   const [showVideo, setShowVideo] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -243,6 +245,8 @@ export default function MiniPlayer({ track, isPlaying, onTogglePlay, onClose, pl
         isLiked={isLiked || false}
         onLike={onLike || (() => {})}
         showVideo={showVideoInFull}
+        onStartRadio={onStartRadio}
+        radioLoading={radioLoading}
         onToggleVideo={() => {
           setShowVideoInFull(v => {
             // Sync mini player video state

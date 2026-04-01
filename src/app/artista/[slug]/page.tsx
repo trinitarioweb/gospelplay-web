@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { ArrowLeft, CheckCircle, Play, Shuffle, Heart, Share2, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Play, Shuffle, Heart, Share2, Loader2, Radio } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { obtenerArtistaPorSlug, obtenerArtistasRelacionados } from '@/lib/database';
 import { usePlayer } from '@/context/PlayerContext';
@@ -32,10 +32,12 @@ const tipoLabels: Record<string, string> = {
 export default function ArtistaPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
-  const { playTrack, playFromList, toggleLike, likedSongs } = usePlayer();
+  const { playTrack, playFromList, startRadio, radioLoading, toggleLike, likedSongs } = usePlayer();
   const [artista, setArtista] = useState<Artista | null>(null);
   const [relacionados, setRelacionados] = useState<Artista[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<{ cancionesAgregadas: number } | null>(null);
 
   useEffect(() => {
     async function cargar() {
@@ -43,10 +45,39 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
       const a = await obtenerArtistaPorSlug(slug);
       setArtista(a);
 
-      if (a?.artistas_relacionados?.length) {
-        const rel = await obtenerArtistasRelacionados(a.artistas_relacionados);
-        setRelacionados(rel);
+      if (a) {
+        // Enrich artist in background (add more songs + similar artists)
+        setEnriching(true);
+        fetch(`/api/artista/${slug}/enriquecer`)
+          .then(r => r.json())
+          .then(async (data) => {
+            setEnrichResult(data);
+            setEnriching(false);
+
+            // If new songs were added, reload artist data
+            if (data.cancionesAgregadas > 0) {
+              const refreshed = await obtenerArtistaPorSlug(slug);
+              if (refreshed) setArtista(refreshed);
+            }
+
+            // If similar artists were found, reload related
+            if (data.similaresEnCatalogo > 0) {
+              const refreshedArtist = await obtenerArtistaPorSlug(slug);
+              if (refreshedArtist?.artistas_relacionados?.length) {
+                const rel = await obtenerArtistasRelacionados(refreshedArtist.artistas_relacionados);
+                setRelacionados(rel);
+              }
+            }
+          })
+          .catch(() => setEnriching(false));
+
+        // Load existing related artists
+        if (a.artistas_relacionados?.length) {
+          const rel = await obtenerArtistasRelacionados(a.artistas_relacionados);
+          setRelacionados(rel);
+        }
       }
+
       setLoading(false);
     }
     cargar();
@@ -78,20 +109,14 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
     <div className="min-h-screen bg-[#121212] text-white">
       {/* Header with gradient */}
       <div className="relative">
-        {/* Background gradient */}
         <div className="absolute inset-0 h-[350px] bg-gradient-to-b from-amber-900/40 to-[#121212]" />
 
-        {/* Back button */}
-        <button
-          onClick={() => router.push('/')}
-          className="relative z-10 p-4"
-        >
+        <button onClick={() => router.push('/')} className="relative z-10 p-4">
           <ArrowLeft size={24} />
         </button>
 
         {/* Artist info */}
         <div className="relative z-10 px-6 pb-6 flex flex-col sm:flex-row items-center sm:items-end gap-6">
-          {/* Avatar */}
           <div className="w-[180px] h-[180px] rounded-full bg-[#282828] overflow-hidden shadow-2xl flex-shrink-0">
             {artista.imagen ? (
               <img src={artista.imagen} alt={artista.nombre} className="w-full h-full object-cover" />
@@ -127,7 +152,7 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
       </div>
 
       {/* Actions */}
-      <div className="px-6 py-4 flex items-center gap-4">
+      <div className="px-6 py-4 flex items-center gap-3">
         <button
           onClick={() => { if (canciones.length > 0) playFromList(artista.nombre, canciones, 0); }}
           className="w-14 h-14 bg-amber-500 rounded-full flex items-center justify-center hover:bg-amber-400 transition shadow-lg"
@@ -145,6 +170,21 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
         >
           <Shuffle size={18} />
         </button>
+
+        {/* Radio button */}
+        <button
+          onClick={() => startRadio(artista.nombre)}
+          disabled={radioLoading}
+          className="flex items-center gap-2 px-4 h-10 bg-gradient-to-r from-amber-600 to-amber-500 rounded-full text-black text-sm font-bold hover:brightness-110 transition disabled:opacity-50"
+        >
+          {radioLoading ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Radio size={16} />
+          )}
+          Iniciar Radio
+        </button>
+
         <button className="w-10 h-10 border border-[#6a6a6a] rounded-full flex items-center justify-center hover:border-white transition">
           <Heart size={18} />
         </button>
@@ -152,6 +192,19 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
           <Share2 size={18} />
         </button>
       </div>
+
+      {/* Enriching indicator */}
+      {enriching && (
+        <div className="px-6 py-2 flex items-center gap-2 text-sm text-amber-400">
+          <Loader2 size={14} className="animate-spin" />
+          Buscando mas canciones...
+        </div>
+      )}
+      {enrichResult && enrichResult.cancionesAgregadas > 0 && !enriching && (
+        <div className="px-6 py-2 text-sm text-green-400">
+          +{enrichResult.cancionesAgregadas} canciones nuevas encontradas
+        </div>
+      )}
 
       {/* Bio */}
       {artista.bio && (
@@ -165,25 +218,43 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
         <div className="px-6 py-4">
           <h2 className="text-xl font-bold mb-4">Popular</h2>
           <div className="space-y-1">
-            {canciones.slice(0, 10).map((cancion: Contenido, index: number) => (
-              <ContentCard
-                key={cancion.id}
-                contenido={cancion}
-                compact
-                index={index + 1}
-                onPlay={() => playTrack(cancion, canciones)}
-                onLike={toggleLike}
-                isLiked={likedSongs.has(cancion.id)}
-              />
+            {canciones.slice(0, 15).map((cancion: Contenido, index: number) => (
+              <div key={cancion.id} className="flex items-center gap-1">
+                <ContentCard
+                  contenido={cancion}
+                  compact
+                  index={index + 1}
+                  onPlay={() => playTrack(cancion, canciones)}
+                  onLike={toggleLike}
+                  isLiked={likedSongs.has(cancion.id)}
+                />
+                {/* Mini radio button per song */}
+                <button
+                  onClick={() => startRadio(artista.nombre, cancion.titulo)}
+                  className="flex-shrink-0 p-2 text-[#6a6a6a] hover:text-amber-400 transition"
+                  title="Iniciar radio con esta cancion"
+                >
+                  <Radio size={14} />
+                </button>
+              </div>
             ))}
           </div>
+
+          {canciones.length > 15 && (
+            <button
+              onClick={() => playFromList(`${artista.nombre} - Todas`, canciones, 0)}
+              className="mt-4 text-sm text-[#b3b3b3] hover:text-white font-semibold transition"
+            >
+              Ver todas ({canciones.length} canciones)
+            </button>
+          )}
         </div>
       )}
 
       {/* Related artists */}
       {relacionados.length > 0 && (
         <div className="px-6 py-6">
-          <h2 className="text-xl font-bold mb-4">Artistas Relacionados</h2>
+          <h2 className="text-xl font-bold mb-4">Artistas Similares</h2>
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
             {relacionados.map(rel => (
               <ArtistaCard
@@ -196,7 +267,6 @@ export default function ArtistaPage({ params }: { params: Promise<{ slug: string
         </div>
       )}
 
-      {/* Bottom spacing for mini player */}
       <div className="h-24" />
     </div>
   );

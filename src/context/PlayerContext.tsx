@@ -15,8 +15,10 @@ interface PlayerContextType {
   isPlaying: boolean;
   playlistContext: PlaylistContextData | null;
   likedSongs: Set<string>;
+  radioLoading: boolean;
   playTrack: (track: Contenido, allTracks?: Contenido[]) => void;
   playFromList: (nombre: string, items: Contenido[], startIndex: number) => void;
+  startRadio: (artistName: string, trackName?: string) => void;
   handleNext: () => void;
   handlePrevious: () => void;
   toggleLike: (id: string) => void;
@@ -37,6 +39,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [likedSongs, setLikedSongs] = useState<Set<string>>(new Set());
   const [playlistCtx, setPlaylistCtx] = useState<PlaylistContextData | null>(null);
+  const [radioLoading, setRadioLoading] = useState(false);
+
+  const startRadio = useCallback(async (artistName: string, trackName?: string) => {
+    setRadioLoading(true);
+    try {
+      const params = new URLSearchParams({ artist: artistName });
+      if (trackName) params.set('track', trackName);
+      const res = await fetch(`/api/radio?${params}`);
+      if (!res.ok) throw new Error('Radio API error');
+      const data = await res.json();
+      if (data.tracks?.length > 0) {
+        setPlaylistCtx({ nombre: data.nombre, items: data.tracks, currentIndex: 0 });
+        setCurrentTrack(data.tracks[0]);
+        setIsPlaying(true);
+      }
+    } catch (e) {
+      console.error('Error starting radio:', e);
+    } finally {
+      setRadioLoading(false);
+    }
+  }, []);
 
   const playTrack = useCallback((track: Contenido, allTracks?: Contenido[]) => {
     setCurrentTrack(track);
@@ -117,8 +140,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   return (
     <PlayerCtx.Provider value={{
-      currentTrack, isPlaying, playlistContext: playlistCtx, likedSongs,
-      playTrack, playFromList, handleNext, handlePrevious, toggleLike, setIsPlaying, closePlayer,
+      currentTrack, isPlaying, playlistContext: playlistCtx, likedSongs, radioLoading,
+      playTrack, playFromList, startRadio, handleNext, handlePrevious, toggleLike, setIsPlaying, closePlayer,
     }}>
       {children}
       <MiniPlayer
@@ -131,6 +154,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         onPrevious={handlePrevious}
         isLiked={currentTrack ? likedSongs.has(currentTrack.id) : false}
         onLike={toggleLike}
+        onStartRadio={startRadio}
+        radioLoading={radioLoading}
       />
     </PlayerCtx.Provider>
   );

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronDown, SkipBack, SkipForward, Play, Pause, Shuffle, Repeat,
   ListPlus, ListMusic, Share2, Video, VideoOff, Heart, ExternalLink, Loader2,
-  Speaker
+  Speaker, Radio
 } from 'lucide-react';
 import type { Contenido } from '@/types/content';
 import { obtenerPlaylists, agregarAPlaylist, crearPlaylist } from '@/lib/database';
@@ -40,6 +40,8 @@ interface FullPlayerProps {
   onLike: (id: string) => void;
   showVideo: boolean;
   onToggleVideo: () => void;
+  onStartRadio?: (artist: string, track?: string) => void;
+  radioLoading?: boolean;
 }
 
 
@@ -97,6 +99,7 @@ export default function FullPlayer({
   onNext, onPrevious, playlistContext,
   playerRef, currentTime, duration, onSeek,
   isLiked, onLike, showVideo, onToggleVideo,
+  onStartRadio, radioLoading,
 }: FullPlayerProps) {
   const [showQueue, setShowQueue] = useState(false);
   const [showAddPlaylist, setShowAddPlaylist] = useState(false);
@@ -582,6 +585,16 @@ export default function FullPlayer({
                   </div>
                 )}
               </div>
+              {onStartRadio && (
+                <button
+                  onClick={() => onStartRadio(track.artista, track.titulo)}
+                  disabled={radioLoading}
+                  className="p-2 text-white/50 hover:text-amber-400 transition disabled:opacity-50"
+                  title="Iniciar radio con esta cancion"
+                >
+                  {radioLoading ? <Loader2 size={18} className="animate-spin" /> : <Radio size={18} />}
+                </button>
+              )}
               <button onClick={() => setShowQueue(true)} className="p-2 text-white/50 hover:text-white transition" title="Cola">
                 <ListMusic size={18} />
               </button>
