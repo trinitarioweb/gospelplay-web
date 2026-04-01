@@ -56,37 +56,30 @@ function logMsg(msg) { console.log(msg); log.push(msg); }
 // ============================================================
 // YOUTUBE SEARCH
 // ============================================================
-// ── FILTROS ESTRICTOS DE CONTENIDO ──
+// ── FILTROS DE CONTENIDO ──
 
-// El título DEBE contener alguno de estos para ser aceptado como música oficial
-const TITULO_OFICIAL = [
-  /official\s*(music\s*)?video/i, /video\s*oficial/i,
-  /official\s*audio/i, /audio\s*oficial/i,
-  /lyric\s*video/i, /lyrics?\s*oficial/i,
-  /official\s*lyric/i, /visualizer/i,
-  /official\s*video/i, /video\s*clip/i,
-  /videoclip/i, /music\s*video/i,
-  /\(official\)/i, /\[official\]/i,
-  /official\s*live/i, /en\s*vivo\s*oficial/i,
-  /worship\s*session/i, /acoustic\s*session/i,
-  /unplugged/i, /live\s*at\b/i, /live\s*from\b/i,
-  /en\s*vivo\s*desde/i, /sesi[oó]n\s*en\s*vivo/i,
-];
-
-// Rechazar si contiene alguno de estos (basura)
+// Rechazar videos con estos patrones en el título (no son música)
 const TITULO_BLACKLIST = [
   /\bmix\b/i, /\bmejores\s*(éxitos|exitos)\b/i, /\brecopilaci[oó]n\b/i,
   /\bplaylist\b/i, /\b\d+\s*hora/i, /\bfull\s*album\b/i,
   /\bcompleto\b/i, /\bgreatest\s*hits\b/i, /\bbest\s*of\b/i,
   /\btop\s*\d+/i, /\bcollection\b/i, /\bnon[\s-]?stop\b/i,
-  /\breaction\b/i, /\breaccion\b/i, /\bcover\b/i,
+  /\breaction\b/i, /\breaccion\b/i,
   /\btutorial\b/i, /\bentrevista\b/i, /\binterview\b/i,
   /\bpodcast\b/i, /\btrailer\b/i, /\bunboxing\b/i,
   /\bbehind\s*the\s*scenes\b/i, /\bdetras\s*de\s*camaras\b/i,
-  /\bnoticias\b/i, /\bnews\b/i, /\bdocumental\b/i,
-  /\bkaraoke\b/i, /\binstrumental\b.*\btrack\b/i,
-  /\b(sub|doblado|subtitulado)\b/i,
-  /\bcompilaci[oó]n\b/i, /\bcompilation\b/i,
+  /\bnoticias\b/i, /\bnews\b/i, /\bdocumental\b/i, /\bdocumentary\b/i,
+  /\bkaraoke\b/i, /\bcompilaci[oó]n\b/i, /\bcompilation\b/i,
+  /\bpredica\b/i, /\bsermon\b/i, /\bconferencia\b/i,
+  /\bdevocional\b/i, /\btestimonio\b/i, /\bresumen\b/i,
+];
+
+// Canales genéricos que NO son del artista
+const CANAL_BLACKLIST = [
+  /musica\s*cristiana/i, /gospel\s*music/i, /worship\s*songs/i,
+  /christian\s*music/i, /alabanza/i, /top\s*worship/i,
+  /best\s*of/i, /recopilacion/i, /lyrics?\s*channel/i,
+  /reaction/i, /reacts/i,
 ];
 
 async function buscarYouTube(query, maxResults = 10) {
@@ -117,10 +110,13 @@ async function buscarYouTube(query, maxResults = 10) {
           const s = b?.metadataBadgeRenderer?.style || '';
           return s.includes('VERIFIED');
         });
+        const channelId = video.ownerText?.runs?.[0]?.navigationEndpoint
+          ?.browseEndpoint?.browseId || '';
         results.push({
           videoId: video.videoId,
           title: video.title?.runs?.[0]?.text || '',
           author: video.ownerText?.runs?.[0]?.text || '',
+          channelId,
           channelVerified: isVerified,
         });
         if (results.length >= maxResults) break;
@@ -131,37 +127,57 @@ async function buscarYouTube(query, maxResults = 10) {
   } catch { return []; }
 }
 
+/**
+ * Normaliza un nombre para comparación: quita acentos, espacios, puntuación
+ */
+function normalizar(str) {
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Verifica si el canal de YouTube pertenece al artista.
+ * Esta es la verificación principal - si el canal no es del artista, se rechaza.
+ */
+function canalEsDelArtista(canalNombre, artistaNombre) {
+  const canal = normalizar(canalNombre);
+  const artista = normalizar(artistaNombre);
+
+  // Match directo: "Elevation Worship" vs "Elevation Worship"
+  if (canal === artista) return true;
+
+  // Canal contiene nombre del artista: "Chris Tomlin" en "ChrisTomlinVEVO"
+  if (canal.includes(artista)) return true;
+
+  // Artista contenido en canal (sin sufijos VEVO/Official/Topic)
+  const canalLimpio = canal.replace(/(vevo|official|music|tv|topic|channel)$/g, '').trim();
+  if (canalLimpio === artista) return true;
+  if (canalLimpio.includes(artista) || artista.includes(canalLimpio)) return true;
+
+  // Para artistas con nombre corto (< 6 chars), exigir match más estricto
+  if (artista.length < 6) return canalLimpio === artista;
+
+  // Comparar primeras 6+ letras (para variaciones como "MielSanMarcos" vs "mielsanmarcosvevo")
+  const minLen = Math.min(artista.length, 6);
+  if (canalLimpio.startsWith(artista.substring(0, minLen)) && canalLimpio.length < artista.length + 10) return true;
+
+  return false;
+}
+
 function filtrarOficiales(videos, nombreArtista) {
-  const nombreLower = nombreArtista.toLowerCase();
   return videos.filter(video => {
-    const titulo = video.title;
-    const autorLower = video.author.toLowerCase();
-    const autorLimpio = autorLower.replace(/vevo|official|music|tv|topic/gi, '').trim();
+    // 1. RECHAZAR basura por título
+    if (TITULO_BLACKLIST.some(re => re.test(video.title))) return false;
 
-    // 1. RECHAZAR basura sin importar nada más
-    if (TITULO_BLACKLIST.some(re => re.test(titulo))) return false;
+    // 2. RECHAZAR canales genéricos (no del artista)
+    if (CANAL_BLACKLIST.some(re => re.test(video.author))) return false;
 
-    // 2. El canal DEBE ser del artista (nombre similar o VEVO)
-    const canalEsDelArtista =
-      autorLower.includes(nombreLower) ||
-      nombreLower.includes(autorLimpio) ||
-      autorLower.includes(nombreLower.replace(/\s+/g, '')) || // "ChrisTomlin" vs "chris tomlin"
-      autorLower.includes('vevo') && autorLimpio.includes(nombreLower.substring(0, 5));
+    // 3. El canal DEBE ser del artista - este es el filtro principal
+    if (!canalEsDelArtista(video.author, nombreArtista)) return false;
 
-    if (!canalEsDelArtista) return false;
-
-    // 3. El título DEBE indicar que es contenido oficial de música
-    const esOficial = TITULO_OFICIAL.some(re => re.test(titulo));
-    if (esOficial) return true;
-
-    // 4. Si el canal es verificado Y el título parece una canción (corto, sin basura), aceptar
-    if (video.channelVerified && titulo.length < 100) {
-      // Verificar que el título tenga formato de canción: "Artista - Canción" o solo nombre de canción
-      const tieneFormatoCancion = /[-–]/.test(titulo) || /\(.*\)/.test(titulo);
-      if (tieneFormatoCancion) return true;
-    }
-
-    return false;
+    // Si pasó los 3 filtros: es del canal del artista y no es basura → aceptar
+    return true;
   });
 }
 
