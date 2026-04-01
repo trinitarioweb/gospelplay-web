@@ -1,7 +1,8 @@
 'use client';
 
-import { Home, Search, BookOpen, Music, Flame, Radio, X, Library, ListMusic, Plus, Film, Podcast, BookMarked } from 'lucide-react';
+import { Home, Search, BookOpen, Music, Flame, Radio, X, Library, ListMusic, Plus, Film, Podcast, BookMarked, LogIn, LogOut, Settings } from 'lucide-react';
 import type { Playlist } from '@/types/content';
+import { useAuth } from '@/context/AuthContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -31,6 +32,8 @@ const sectionItems = [
 ];
 
 export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, playlists = [], onSelectPlaylist, onCreatePlaylist, activePlaylistId }: SidebarProps) {
+  const { user, profile, loading, signInWithGoogle, signOut } = useAuth();
+
   return (
     <>
       {/* Mobile overlay */}
@@ -147,14 +150,49 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, pl
 
         {/* User */}
         <div className="bg-[#121212] rounded-lg px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-xs font-bold text-black">
-              U
+          {!loading && user && profile ? (
+            <div className="flex items-center gap-3">
+              {profile.avatar ? (
+                <img src={profile.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-xs font-bold text-black">
+                  {profile.nombre.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{profile.nombre}</p>
+                {profile.spotify_connected && (
+                  <p className="text-[10px] text-green-400">Spotify conectado</p>
+                )}
+              </div>
+              <button
+                onClick={() => { setActiveTab('perfil'); setIsOpen(false); }}
+                className="p-1.5 hover:bg-white/10 rounded-full text-[#b3b3b3] hover:text-white transition"
+              >
+                <Settings size={16} />
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">Usuario</p>
+          ) : !loading && !user ? (
+            <button
+              onClick={signInWithGoogle}
+              className="w-full flex items-center gap-3 px-1 py-1 rounded-md hover:bg-white/5 transition"
+            >
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <LogIn size={16} className="text-amber-400" />
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-semibold text-white">Iniciar sesion</p>
+                <p className="text-[10px] text-[#6a6a6a]">Google</p>
+              </div>
+            </button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#282828] animate-pulse" />
+              <div className="flex-1">
+                <div className="h-3 w-20 bg-[#282828] rounded animate-pulse" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </aside>
     </>

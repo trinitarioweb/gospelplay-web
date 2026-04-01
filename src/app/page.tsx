@@ -10,6 +10,7 @@ import { obtenerMusica, obtenerEnsenanzas, obtenerEstudios, obtenerTodoContenido
 import { temasPopulares, librosBiblia, necesidades } from '@/lib/datos-ejemplo';
 import ArtistaCard from '@/components/ArtistaCard';
 import { usePlayer } from '@/context/PlayerContext';
+import { useAuth } from '@/context/AuthContext';
 import type { Contenido, GuiaEstudio, FiltrosBusqueda, Playlist, Artista } from '@/types/content';
 
 const GENRE_COLORS: Record<string, string> = {
@@ -90,6 +91,7 @@ const LIBROS_RECOMENDADOS = [
 
 export default function HomePage() {
   const { currentTrack, likedSongs, playTrack: contextPlayTrack, playFromList, toggleLike } = usePlayer();
+  const { user, profile, signInWithGoogle, signOut, connectSpotify, disconnectSpotify } = useAuth();
 
   const [activeTab, setActiveTab] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1070,6 +1072,119 @@ export default function HomePage() {
               )}
             </div>
           )}
+          {/* ===== PERFIL ===== */}
+          {activeTab === 'perfil' && (
+            <div className="p-4 md:p-6 max-w-2xl mx-auto section-fade">
+              <h2 className="text-2xl md:text-3xl font-extrabold mb-6">Mi Perfil</h2>
+
+              {user && profile ? (
+                <div className="space-y-4">
+                  {/* Profile card */}
+                  <div className="bg-[#181818] rounded-xl p-6 flex items-center gap-4">
+                    {profile.avatar ? (
+                      <img src={profile.avatar} alt="" className="w-16 h-16 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-2xl font-bold text-black">
+                        {profile.nombre.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-white">{profile.nombre}</h3>
+                      <p className="text-sm text-[#6a6a6a]">{profile.email}</p>
+                    </div>
+                  </div>
+
+                  {/* Spotify connection */}
+                  <div className="bg-[#181818] rounded-xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="#1DB954">
+                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                      </svg>
+                      <h4 className="font-bold text-white">Spotify</h4>
+                    </div>
+
+                    {profile.spotify_connected ? (
+                      <div>
+                        <p className="text-sm text-green-400 mb-3">Conectado</p>
+                        <p className="text-xs text-[#6a6a6a] mb-4">
+                          Analizamos tus artistas cristianos en Spotify para darte recomendaciones personalizadas con Last.fm
+                        </p>
+                        <button
+                          onClick={disconnectSpotify}
+                          className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-full text-sm font-semibold text-white transition"
+                        >
+                          Desconectar
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-[#b3b3b3] mb-4">
+                          Conecta tu Spotify para descubrir artistas cristianos basados en lo que ya escuchas.
+                          Usamos Last.fm para encontrar artistas similares que te van a encantar.
+                        </p>
+                        <button
+                          onClick={connectSpotify}
+                          className="px-6 py-2.5 bg-[#1DB954] hover:bg-[#1ed760] rounded-full text-sm font-bold text-black transition flex items-center gap-2"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="black">
+                            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                          </svg>
+                          Conectar Spotify
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stats */}
+                  <div className="bg-[#181818] rounded-xl p-6">
+                    <h4 className="font-bold text-white mb-3">Tu actividad</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-[#282828] rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-amber-400">{likedSongs.size}</p>
+                        <p className="text-xs text-[#6a6a6a]">Favoritos</p>
+                      </div>
+                      <div className="bg-[#282828] rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-amber-400">{playlists.length}</p>
+                        <p className="text-xs text-[#6a6a6a]">Playlists</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sign out */}
+                  <button
+                    onClick={signOut}
+                    className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-semibold text-[#b3b3b3] transition"
+                  >
+                    Cerrar sesion
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-20">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                    <Music size={32} className="text-black" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Inicia sesion en GospelPlay</h3>
+                  <p className="text-sm text-[#6a6a6a] mb-6 max-w-xs mx-auto">
+                    Guarda tu contenido favorito, crea playlists y conecta Spotify para recomendaciones personalizadas
+                  </p>
+                  <button
+                    onClick={signInWithGoogle}
+                    className="px-8 py-3 bg-white hover:bg-gray-100 rounded-full text-sm font-bold text-black transition flex items-center gap-3 mx-auto"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18">
+                      <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                      <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/>
+                      <path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                    </svg>
+                    Iniciar con Google
+                  </button>
+                </div>
+              )}
+              <div className="h-24"></div>
+            </div>
+          )}
+
         </main>
       </div>
 
