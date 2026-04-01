@@ -56,11 +56,37 @@ function logMsg(msg) { console.log(msg); log.push(msg); }
 // ============================================================
 // YOUTUBE SEARCH
 // ============================================================
+// ── FILTROS ESTRICTOS DE CONTENIDO ──
+
+// El título DEBE contener alguno de estos para ser aceptado como música oficial
+const TITULO_OFICIAL = [
+  /official\s*(music\s*)?video/i, /video\s*oficial/i,
+  /official\s*audio/i, /audio\s*oficial/i,
+  /lyric\s*video/i, /lyrics?\s*oficial/i,
+  /official\s*lyric/i, /visualizer/i,
+  /official\s*video/i, /video\s*clip/i,
+  /videoclip/i, /music\s*video/i,
+  /\(official\)/i, /\[official\]/i,
+  /official\s*live/i, /en\s*vivo\s*oficial/i,
+  /worship\s*session/i, /acoustic\s*session/i,
+  /unplugged/i, /live\s*at\b/i, /live\s*from\b/i,
+  /en\s*vivo\s*desde/i, /sesi[oó]n\s*en\s*vivo/i,
+];
+
+// Rechazar si contiene alguno de estos (basura)
 const TITULO_BLACKLIST = [
   /\bmix\b/i, /\bmejores\s*(éxitos|exitos)\b/i, /\brecopilaci[oó]n\b/i,
   /\bplaylist\b/i, /\b\d+\s*hora/i, /\bfull\s*album\b/i,
   /\bcompleto\b/i, /\bgreatest\s*hits\b/i, /\bbest\s*of\b/i,
   /\btop\s*\d+/i, /\bcollection\b/i, /\bnon[\s-]?stop\b/i,
+  /\breaction\b/i, /\breaccion\b/i, /\bcover\b/i,
+  /\btutorial\b/i, /\bentrevista\b/i, /\binterview\b/i,
+  /\bpodcast\b/i, /\btrailer\b/i, /\bunboxing\b/i,
+  /\bbehind\s*the\s*scenes\b/i, /\bdetras\s*de\s*camaras\b/i,
+  /\bnoticias\b/i, /\bnews\b/i, /\bdocumental\b/i,
+  /\bkaraoke\b/i, /\binstrumental\b.*\btrack\b/i,
+  /\b(sub|doblado|subtitulado)\b/i,
+  /\bcompilaci[oó]n\b/i, /\bcompilation\b/i,
 ];
 
 async function buscarYouTube(query, maxResults = 10) {
@@ -108,10 +134,33 @@ async function buscarYouTube(query, maxResults = 10) {
 function filtrarOficiales(videos, nombreArtista) {
   const nombreLower = nombreArtista.toLowerCase();
   return videos.filter(video => {
-    if (TITULO_BLACKLIST.some(re => re.test(video.title))) return false;
-    if (video.channelVerified) return true;
-    const al = video.author.toLowerCase();
-    if (al.includes(nombreLower) || nombreLower.includes(al.replace(/vevo|official|music|tv/gi, '').trim())) return true;
+    const titulo = video.title;
+    const autorLower = video.author.toLowerCase();
+    const autorLimpio = autorLower.replace(/vevo|official|music|tv|topic/gi, '').trim();
+
+    // 1. RECHAZAR basura sin importar nada más
+    if (TITULO_BLACKLIST.some(re => re.test(titulo))) return false;
+
+    // 2. El canal DEBE ser del artista (nombre similar o VEVO)
+    const canalEsDelArtista =
+      autorLower.includes(nombreLower) ||
+      nombreLower.includes(autorLimpio) ||
+      autorLower.includes(nombreLower.replace(/\s+/g, '')) || // "ChrisTomlin" vs "chris tomlin"
+      autorLower.includes('vevo') && autorLimpio.includes(nombreLower.substring(0, 5));
+
+    if (!canalEsDelArtista) return false;
+
+    // 3. El título DEBE indicar que es contenido oficial de música
+    const esOficial = TITULO_OFICIAL.some(re => re.test(titulo));
+    if (esOficial) return true;
+
+    // 4. Si el canal es verificado Y el título parece una canción (corto, sin basura), aceptar
+    if (video.channelVerified && titulo.length < 100) {
+      // Verificar que el título tenga formato de canción: "Artista - Canción" o solo nombre de canción
+      const tieneFormatoCancion = /[-–]/.test(titulo) || /\(.*\)/.test(titulo);
+      if (tieneFormatoCancion) return true;
+    }
+
     return false;
   });
 }
@@ -256,9 +305,10 @@ async function buscarNuevasDeExistentes() {
   for (const artista of shuffled) {
     if (artista.tipo === 'pastor' || artista.tipo === 'predicador') continue;
 
-    const query = `${artista.nombre} official music video 2025 2026`;
-    const videos = await buscarYouTube(query, 8);
+    const query = `"${artista.nombre}" official music video`;
+    const videos = await buscarYouTube(query, 10);
     const oficiales = filtrarOficiales(videos, artista.nombre);
+    if (oficiales.length === 0) continue;
 
     let agregadas = 0;
     for (const video of oficiales) {
@@ -340,10 +390,10 @@ async function descubrirNuevos() {
 
     if (!esTagCristiano(tags)) continue;
 
-    // Search YouTube
-    const videos = await buscarYouTube(`${candidato.nombre} official video`, 10);
+    // Search YouTube - solo contenido oficial
+    const videos = await buscarYouTube(`"${candidato.nombre}" official music video`, 10);
     const oficiales = filtrarOficiales(videos, candidato.nombre);
-    if (oficiales.length === 0) continue;
+    if (oficiales.length < 2) continue; // Mínimo 2 videos oficiales para confirmar que es artista real
 
     // Create artist
     const slug = generarSlug(candidato.nombre);
